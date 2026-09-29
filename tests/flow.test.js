@@ -30,3 +30,11 @@ test('register, join, receive queue update, leave, and review history',()=>{
   click('logout');
   assert.match(app.innerHTML,/Log in/);
 });
+
+test('seeded admin lands on the admin portal',()=>{
+  const adminForm={elements:{email:{value:'admin@queuesmart.local'},password:{value:'admin1234'}}};
+  handlers.submit({target:{id:'auth-form',...adminForm},preventDefault(){}});
+  assert.match(app.innerHTML,/ADMIN PORTAL/);
+  click('logout');
+  assert.match(app.innerHTML,/Log in/);
+});

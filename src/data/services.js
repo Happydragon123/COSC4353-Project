@@ -5,3 +5,13 @@ export const SERVICES = [
   {id:'records', name:'Student Records', description:'Transcripts, enrollment verification, and records.', icon:'▦', wait:0, length:0, open:false}
 ];
 export const serviceById = id => SERVICES.find(s=>s.id===id);
+
+export function toggleService(id) {
+  const service = serviceById(id);
+
+  if (!service) {
+    return;
+  }
+
+  service.open = !service.open;
+}
