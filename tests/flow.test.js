@@ -38,3 +38,68 @@ test('seeded admin lands on the admin portal',()=>{
   click('logout');
   assert.match(app.innerHTML,/Log in/);
 });
+
+test('admin can manage a service queue',() => {
+    const adminForm = {
+      elements: {
+        email: {
+          value: 'admin@queuesmart.local'
+        },
+
+        password: {
+          value:'admin1234'
+        }
+      }
+    };
+
+
+    handlers.submit({
+      target: {
+        id: 'auth-form', ...adminForm
+      },
+
+      preventDefault() {}
+    });
+
+
+    click(
+      '',
+      {
+        page: 'admin-queue'
+      }
+    );
+
+
+    assert.match(
+      app.innerHTML, /Queue Management/
+    );
+
+
+    assert.match(
+      app.innerHTML, /Mock User 1/
+    );
+
+
+    click(
+      '',
+      {
+        action: 'serve-next', serviceId: 'advising'
+      }
+    );
+
+
+    assert.doesNotMatch(
+      app.innerHTML, /mockuser1@example.com/
+    );
+
+
+    click(
+      'logout'
+    );
+
+
+    assert.match(
+      app.innerHTML, /Log in/
+    );
+  }
+);
