@@ -1,3 +1,5 @@
+import {SERVICES, serviceById} from './services.js';
+
 // Mock persistence; replace this module with API calls for A3.
 export const KEYS = {
   accounts: 'qs_accounts_v1',
@@ -95,3 +97,20 @@ export function updateAdminQueues(queues) {
 
 function seedAdmin(){const list=accounts();if(list.some(a=>a.email===DEMO_ADMIN.email))return;list.push({...DEMO_ADMIN});save(KEYS.accounts,list)}
 seedAdmin();
+
+// Services stay in memory for this stage; only editable fields are copied.
+export function saveService(id, {name, description, expectedDuration, priority}) {
+  const details = {name, description, expectedDuration, priority};
+  if (id !== null) {
+    const service = serviceById(id);
+    if (!service) return null;
+    Object.assign(service, details);
+    return service;
+  }
+
+  let newId;
+  do { newId = `service-${crypto.randomUUID()}`; } while (serviceById(newId));
+  const service = {id:newId, ...details, icon:'▤', wait:0, length:0, open:true};
+  SERVICES.push(service);
+  return service;
+}
