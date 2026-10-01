@@ -1,18 +1,43 @@
-# QueueSmart A2 front end: authentication and user screens
+# QueueSmart
 
-This is one part of the team project. It covers login, registration, user dashboard, join queue, queue status, history, and in-app notifications. The Admin Dashboard, Service Management, and Queue Management screens still need to be added by teammates.
+QueueSmart is a front-end prototype for joining and managing service queues. This project was developed for COSC 4353 - Software Design
 
-**Technology:** plain HTML, CSS, and JavaScript ES modules. This keeps A2 easy to run without installing a framework while giving each team feature its own files. Forms use semantic HTML and client-side validation; layouts are responsive. The shared data layer can be replaced with API calls in A3.
+The prototype includes user account screens, queue interactions, and an admin view for monitoring services and managing waiting queues. Queue and service data are simulated in the browser; this project does not currently connect to a production backend or database.
 
-## Run
+## Features
 
-With Node.js installed, start the local server in this folder:
+### User experience
+
+- Register, log in, and log out
+- View the user dashboard and available services
+- Join a service queue and view queue status
+- Simulate queue movement and service
+- View queue history and in-app notifications
+
+### Admin experience
+
+- View the admin dashboard, service status, and queue lengths
+- Open or close a service queue
+- View the queue for a selected service
+- Change the order of people waiting, remove a person, or serve the next person
+
+The Service Management screen is currently a placeholder.
+
+## Technology
+
+- HTML
+- CSS
+- JavaScript ES modules
+- Node.js built-in HTTP server
+
+The prototype stores account and application data in the browser. Queue activity and service behavior are simulated.
+
+## Run locally
+
+Install Node.js, then run these commands from the project directory:
 
 ```bash
 npm start
-```
-
-Visit `http://localhost:8000`. Stop the server with Ctrl+C. Run `npm test` separately for the flow smoke test. No `npm install` is needed. The browser uses ES modules, so opening `index.html` as a `file://` page may be blocked.
 
 ## Demo
 
@@ -23,11 +48,3 @@ Visit `http://localhost:8000`. Stop the server with Ctrl+C. Run `npm test` separ
 5. The bell opens in-app notifications; **Mark all read** updates the unread count.
 
 Email format, required fields, maximum lengths, password length, and confirmation are validated in the browser. Data is stored in this browser only. Services, waits, and movement are mocked.
-
-## Team development
-
-Read [the integration guide](docs/TEAM_INTEGRATION.md). The feature folders let teammates add admin screens without editing user screens. Changes to shared routes, authentication role, services, and queue data should be coordinated.
-
-## A2 screenshots
-
-Capture Login, Registration, User Dashboard, Join Queue, Queue Status, History, and Notifications. Teammates should add Admin Dashboard, Service Management, and Queue Management screenshots to the single submission document.
