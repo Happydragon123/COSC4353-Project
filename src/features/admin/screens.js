@@ -64,35 +64,43 @@ function serviceForm() {
 
   const service = SERVICES.find(item => item.id === state.serviceForm.id);
   const editing = Boolean(service);
-  const priority = service?.priority ?? 'medium';
+  const values = state.serviceForm.values ?? service ?? {};
+  const priority = values.priority ?? 'medium';
+  const errors = state.serviceForm.errors ?? {};
+  const fieldStatus = key => `aria-invalid="${Boolean(errors[key])}"`;
+  const fieldError = key => `<span class="error" id="service-${key}-error" aria-live="polite">${escapeHTML(errors[key] ?? '')}</span>`;
 
   return `
     <section class="card admin-service-form" aria-labelledby="service-form-title">
       <h2 id="service-form-title">${editing ? 'Edit Service' : 'Create Service'}</h2>
-      <p class="muted" id="service-form-note">Saving will be available in the next stage.</p>
+      <p class="muted" id="service-form-note">Changes last until this page is refreshed.</p>
       <form id="service-form" novalidate aria-describedby="service-form-note">
         <div class="field">
           <label for="service-name">Service Name</label>
-          <input id="service-name" name="name" value="${escapeHTML(service?.name ?? '')}">
+          <input id="service-name" name="name" required ${fieldStatus('name')} aria-describedby="service-name-error" value="${escapeHTML(values.name ?? '')}">
+          ${fieldError('name')}
         </div>
         <div class="field">
           <label for="service-description">Description</label>
-          <textarea id="service-description" name="description" rows="3">${escapeHTML(service?.description ?? '')}</textarea>
+          <textarea id="service-description" name="description" rows="3" required ${fieldStatus('description')} aria-describedby="service-description-error">${escapeHTML(values.description ?? '')}</textarea>
+          ${fieldError('description')}
         </div>
         <div class="grid grid-2">
           <div class="field">
             <label for="service-duration">Expected Duration (minutes)</label>
-            <input id="service-duration" name="expectedDuration" type="number" step="any" value="${escapeHTML(service?.expectedDuration ?? '')}">
+            <input id="service-duration" name="expectedDuration" type="number" step="any" required ${fieldStatus('expectedDuration')} aria-describedby="service-expectedDuration-error" value="${escapeHTML(values.expectedDuration ?? '')}">
+            ${fieldError('expectedDuration')}
           </div>
           <div class="field">
             <label for="service-priority">Priority Level</label>
-            <select id="service-priority" name="priority">
+            <select id="service-priority" name="priority" required ${fieldStatus('priority')} aria-describedby="service-priority-error">
               ${['low', 'medium', 'high'].map(value => `<option value="${value}" ${priority === value ? 'selected' : ''}>${value[0].toUpperCase() + value.slice(1)}</option>`).join('')}
             </select>
+            ${fieldError('priority')}
           </div>
         </div>
         <div class="admin-service-form-actions">
-          <button class="btn btn-primary" type="submit" disabled>Save</button>
+          <button class="btn btn-primary" type="submit">Save</button>
           <button class="btn btn-outline" type="button" data-action="cancel-service-form">Cancel</button>
         </div>
       </form>
@@ -117,7 +125,7 @@ export function serviceManagement() {
         <div>
           <div class="eyebrow">ADMIN PORTAL</div>
           <h1>Service Management</h1>
-          <p class="muted">View services and prepare their details.</p>
+          <p class="muted">Create services and update their details.</p>
         </div>
         <button class="btn btn-primary" type="button" data-action="create-service">+ Create Service</button>
       </div>

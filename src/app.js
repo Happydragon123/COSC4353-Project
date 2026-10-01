@@ -8,6 +8,8 @@ import {adminDashboard,serviceManagement,queueManagement} from './features/admin
 import {toggleService} from './data/services.js';
 import {serveNextUser, removeQueueUser, moveQueueUser} from './features/admin/queue-actions.js';
 
+import {submitService} from './features/admin/service-actions.js';
+
 const app=document.getElementById('app');
 const userPages={dashboard,join:joinPage,status:statusPage,history:historyPage};
 const adminPages = {'admin-dashboard': adminDashboard,'admin-services': serviceManagement,'admin-queue': queueManagement};
@@ -18,7 +20,7 @@ function render(){
   if(isAdmin()){app.innerHTML=(adminPages[state.page]||adminDashboard)();return}
   app.innerHTML=(userPages[state.page]||dashboard)();
 }
-app.addEventListener('submit',e=>{if(e.target.id==='service-form'){e.preventDefault();return}if(e.target.id==='auth-form'){e.preventDefault();submitAuth(e.target,{render,toast})}});
+app.addEventListener('submit',e=>{if(e.target.id==='service-form'){e.preventDefault();submitService(e.target,{render,toast});return}if(e.target.id==='auth-form'){e.preventDefault();submitAuth(e.target,{render,toast})}});
 app.addEventListener('click',e=>{const el=e.target.closest('button');if(!el)return;if(el.dataset.auth){state.authPage=el.dataset.auth;render()}else if(el.dataset.page)navigate(el.dataset.page);else if(el.dataset.action==='create-service'&&isAdmin()){
   state.serviceForm={id:null};render();document.getElementById('service-name').focus();
 }else if(el.dataset.action==='edit-service'&&isAdmin()){
