@@ -36,15 +36,16 @@ The prototype stores account and application data in the browser. Queue activity
 
 Install Node.js, then run these commands from the project directory:
 
-```bash
 npm start
+Then open in http://localhost:8000/
 
 ## Demo
 
 1. Create an account with a name, email, and 8–72 character password. Log out and log back in.
-2. Join a service from the dashboard or Join a queue screen. One active queue is allowed per account.
-3. On Queue status, select **Simulate queue moving** to update position and trigger notifications. At position #1, select it again to simulate service.
-4. History records served and left queues. Leaving prompts for confirmation.
-5. The bell opens in-app notifications; **Mark all read** updates the unread count.
+2. Or, you can log into an admin account with email:  admin@queuesmart.local and password: admin1234
+3. Join a service from the dashboard or Join a queue screen. One active queue is allowed per account.
+4. On Queue status, select **Simulate queue moving** to update position and trigger notifications. At position #1, select it again to simulate service.
+5. History records served and left queues. Leaving prompts for confirmation.
+6. The bell opens in-app notifications; **Mark all read** updates the unread count.
 
 Email format, required fields, maximum lengths, password length, and confirmation are validated in the browser. Data is stored in this browser only. Services, waits, and movement are mocked.
