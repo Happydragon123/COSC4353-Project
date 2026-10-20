@@ -14,8 +14,8 @@
 
 ## Current data contract
 
-- `SERVICES`: `{ id, name, description, icon, wait, length, open }`. `id` is stable and used by queues/history. `wait` is minutes and `length` is number waiting.
-- Session: `{ name, email }`; add `role: 'user' | 'admin'` when the team implements admin login. Existing browser data will lack `role`, so default it to `user`.
+- `SERVICES`: `{ id, name, description, expectedDuration, priority, icon, wait, length, open }`. `id` is stable and used by queues/history. `wait` is minutes and `length` is number waiting.
+- Session: `{ name, email, role: 'user' | 'admin', token }`. The server determines roles; public registration always creates a user. Legacy sessions without tokens are cleared.
 - Per-user data: `{ queue: null | { serviceId, position, estimate, joinedAt, status }, history: [], notifications: [] }`.
 - Notification: `{ id, text, time, read }`. History entry adds `outcome` and `finishedAt` to the queue record.
 - The `src/data/store.js` module owns browser storage; the views should read through it rather than accessing `localStorage` directly.
@@ -29,6 +29,27 @@
 5. Keep the `data-page`, `data-select`, and action button attributes distinct. Add delegated click handlers in `src/app.js` or a clearly registered admin handler.
 6. Merge small pull requests into the same repository. Put screenshots and each member's contributions in the A2 document; Git history should reflect actual work.
 
-## A3 handoff
+## A3 status
 
-`src/data/store.js` is mock persistence, not secure auth. Replace browser storage with authenticated API requests. Passwords are currently stored in clear text solely to simulate login in A2; never use this approach with real user data. Wait time and queue movement are sample values.
+Authentication and service management are server APIs in `src/backend/`. The UI calls them through `src/data/api.js` with `Authorization: Bearer <token>`. Passwords are hashed in memory; sessions die on logout or process restart.
+
+| Method | Path | Who |
+| --- | --- | --- |
+| POST | `/api/auth/register` | public |
+| POST | `/api/auth/login` | public |
+| POST | `/api/auth/logout` | signed-in |
+| GET | `/api/auth/me` | signed-in |
+| GET | `/api/services` | signed-in |
+| GET | `/api/services/:id` | signed-in |
+| POST | `/api/services` | admin |
+| PUT | `/api/services/:id` | admin |
+
+Queue, wait-time, notifications, and history are still client mock data. Add matching `/api` routes and keep using `handleApi` in `src/backend/http.js`.
+
+## Module 1 and 2 request contracts
+
+Registration accepts `{name, email, password, confirm}`; login accepts `{email, password}`. Both return `{user: {id, name, email, role}, token}`. Names are required strings up to 80 characters, email addresses up to 254 characters, and passwords 8–72 characters. Registration requires matching confirmation. Email addresses are trimmed and normalized to lowercase. Use the seeded admin account listed in README; registration cannot grant admin access.
+
+Service creation requires `{name, description, expectedDuration, priority}`. Name and description are required strings limited to 100 and 500 characters. Duration is positive minutes (a number or numeric form string); priority is `low`, `medium`, or `high`. PUT accepts any subset of these fields plus boolean `open`, and requires at least one recognized field. Creation/update returns `{service}`; listing returns `{services}`. Queue counts and wait values are demo placeholders pending teammates’ modules.
+
+Errors return `{error, fields?}`: 400 for invalid fields or JSON, 401 for missing/invalid authentication, 403 for users attempting admin operations, 404 for unknown routes/services, and 409 for duplicate registration. Field errors map input names to messages. Run `npm test` or `npm run test:coverage`; API tests reset in-memory state between cases. The coverage report covers imported application files; the standalone HTTP listener is not included.

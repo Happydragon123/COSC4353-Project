@@ -1,9 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {handleApi} from '../src/backend/http.js';
 
-// Tiny DOM harness for the delegated UI actions. No external dependencies.
 const memory=new Map();
 globalThis.localStorage={getItem:key=>memory.get(key)??null,setItem:(key,val)=>memory.set(key,val),removeItem:key=>memory.delete(key)};
+globalThis.fetch = async (url, options = {}) => {
+  const pathname = new URL(url, 'http://localhost').pathname;
+  const result = handleApi({
+    method: options.method || 'GET',
+    pathname,
+    headers: options.headers || {},
+    body: options.body ? JSON.parse(options.body) : null
+  });
+  return {
+    ok: result.status >= 200 && result.status < 300,
+    status: result.status,
+    json: async () => result.body ?? {}
+  };
+};
 const handlers={};
 const elements={app:{innerHTML:'',addEventListener:(name,fn)=>{handlers[name]=fn}}};
 globalThis.document={getElementById:id=>elements[id]??(elements[id]={textContent:'',innerHTML:'',setAttribute(){},focus(){}})};
@@ -13,9 +27,9 @@ const app=elements.app;
 const click=(id,dataset={})=>handlers.click({target:{closest:()=>({id,dataset})}});
 const form={elements:{name:{value:'Demo Student'},email:{value:'demo@example.com'},password:{value:'password123'},confirm:{value:'password123'}}};
 
-test('register, join, receive queue update, leave, and review history',()=>{
+test('register, join, receive queue update, leave, and review history', async ()=>{
   click('',{auth:'register'});
-  handlers.submit({target:{id:'auth-form',...form},preventDefault(){}});
+  await handlers.submit({target:{id:'auth-form',...form},preventDefault(){}});
   assert.match(app.innerHTML,/Available services/);
   click('',{page:'join'});
   assert.match(app.innerHTML,/Join this queue/);
@@ -27,82 +41,29 @@ test('register, join, receive queue update, leave, and review history',()=>{
   click('leave');
   click('confirm-leave');
   assert.match(app.innerHTML,/Left queue/);
-  click('logout');
+  await click('logout');
   assert.match(app.innerHTML,/Log in/);
 });
 
-test('seeded admin lands on the admin portal',()=>{
+test('seeded admin lands on the admin portal', async ()=>{
   const adminForm={elements:{email:{value:'admin@queuesmart.local'},password:{value:'admin1234'}}};
-  handlers.submit({target:{id:'auth-form',...adminForm},preventDefault(){}});
+  await handlers.submit({target:{id:'auth-form',...adminForm},preventDefault(){}});
   assert.match(app.innerHTML,/ADMIN PORTAL/);
-  click('logout');
+  await click('logout');
   assert.match(app.innerHTML,/Log in/);
 });
 
-test('admin can manage a service queue',() => {
-    const adminForm = {
-      elements: {
-        email: {
-          value: 'admin@queuesmart.local'
-        },
-
-        password: {
-          value:'admin1234'
-        }
-      }
-    };
-
-
-    handlers.submit({
-      target: {
-        id: 'auth-form', ...adminForm
-      },
-
-      preventDefault() {}
-    });
-
-
-    click(
-      '',
-      {
-        page: 'admin-queue'
-      }
-    );
-
-
-    assert.match(
-      app.innerHTML, /Queue Management/
-    );
-
-
-    assert.match(
-      app.innerHTML, /Mock User 1/
-    );
-
-
-    click(
-      '',
-      {
-        action: 'serve-next', serviceId: 'advising'
-      }
-    );
-
-
-    assert.doesNotMatch(
-      app.innerHTML, /mockuser1@example.com/
-    );
-
-
-    click(
-      'logout'
-    );
-
-
-    assert.match(
-      app.innerHTML, /Log in/
-    );
-  }
-);
+test('admin can manage a service queue', async () => {
+  const adminForm = {elements: {email: {value: 'admin@queuesmart.local'}, password: {value:'admin1234'}}};
+  await handlers.submit({target: {id: 'auth-form', ...adminForm}, preventDefault() {}});
+  click('', {page: 'admin-queue'});
+  assert.match(app.innerHTML, /Queue Management/);
+  assert.match(app.innerHTML, /Mock User 1/);
+  click('', {action: 'serve-next', serviceId: 'advising'});
+  assert.doesNotMatch(app.innerHTML, /mockuser1@example.com/);
+  await click('logout');
+  assert.match(app.innerHTML, /Log in/);
+});
 
 const {SERVICES} = await import('../src/data/services.js');
 const {state} = await import('../src/shared/state.js');
@@ -136,13 +97,13 @@ test('service validation handles blanks, name limits, durations, and priority', 
   }
 });
 
-test('invalid service inputs remain visible and cancel leaves data unchanged', () => {
-  loginAdmin();
+test('invalid service inputs remain visible and cancel leaves data unchanged', async () => {
+  await loginAdmin();
   click('', {page:'admin-services'});
   click('', {action:'edit-service',serviceId:'advising'});
   const before = JSON.stringify(SERVICES);
   const values = {name:'  Changed name  ',description:'   ',expectedDuration:'-2',priority:'high'};
-  submitServiceForm(values);
+  await submitServiceForm(values);
   assert.equal(JSON.stringify(SERVICES), before);
   assert.deepEqual(state.serviceForm.values, values);
   assert.match(app.innerHTML,/value="  Changed name  "/);
@@ -152,66 +113,58 @@ test('invalid service inputs remain visible and cancel leaves data unchanged', (
   click('', {action:'cancel-service-form'});
   assert.equal(state.serviceForm, null);
   assert.equal(JSON.stringify(SERVICES), before);
-  click('logout');
+  await click('logout');
 });
 
-test('create and edit services through delegated events and use new IDs in queue screens', () => {
-  loginAdmin();
+test('create and edit services through delegated events and use new IDs in queue screens', async () => {
+  await loginAdmin();
   click('', {page:'admin-services'});
-  const before = JSON.stringify(SERVICES);
   const originalLength = SERVICES.length;
   const storedBefore = new Map(memory);
-  const edited = SERVICES[0];
-  const original = {...edited};
-  try {
-    click('', {action:'create-service'});
-    assert.match(app.innerHTML,/type="submit">Save/);
-    submitServiceForm(validService);
-    const created = SERVICES.at(-1);
-    assert.equal(SERVICES.length, originalLength + 1);
-    assert.equal(new Set(SERVICES.map(s=>s.id)).size, SERVICES.length);
-    assert.deepEqual({...created,id:undefined}, {id:undefined,name:'New Service',description:'Help with questions.',expectedDuration:12.5,priority:'high',icon:'▤',wait:0,length:0,open:true});
-    assert.equal(state.serviceForm, null);
-    assert.match(app.innerHTML,/New Service/);
-    assert.equal(state.toast, 'Service created.');
-    assert.deepEqual(memory, storedBefore); // Saving services does not persist anything.
+  const editedId = SERVICES[0].id;
+  click('', {action:'create-service'});
+  assert.match(app.innerHTML,/type="submit">Save/);
+  await submitServiceForm(validService);
+  const created = SERVICES.at(-1);
+  assert.equal(SERVICES.length, originalLength + 1);
+  assert.equal(new Set(SERVICES.map(s=>s.id)).size, SERVICES.length);
+  assert.deepEqual({...created,id:undefined}, {id:undefined,name:'New Service',description:'Help with questions.',expectedDuration:12.5,priority:'high',icon:'▤',wait:0,length:0,open:true});
+  assert.equal(state.serviceForm, null);
+  assert.match(app.innerHTML,/New Service/);
+  assert.equal(state.toast, 'Service created.');
+  assert.deepEqual(memory, storedBefore);
 
-    click('', {action:'create-service'});
-    submitServiceForm({...validService,name:'Second service'});
-    assert.notEqual(SERVICES.at(-1).id, created.id);
-    click('', {page:'admin-dashboard'});
-    assert.match(app.innerHTML,/New Service/);
-    click('', {page:'admin-queue'});
-    click('', {adminService:created.id});
-    assert.match(app.innerHTML,/No one is waiting/);
-    assert.deepEqual(adminQueue(created.id), []);
-    assert.equal(serveNextUser(created.id), null);
-    assert.equal(removeQueueUser(created.id,'missing'), null);
-    assert.equal(moveQueueUser(created.id,'missing','up'), null);
+  click('', {action:'create-service'});
+  await submitServiceForm({...validService,name:'Second service'});
+  assert.notEqual(SERVICES.at(-1).id, created.id);
+  click('', {page:'admin-dashboard'});
+  assert.match(app.innerHTML,/New Service/);
+  click('', {page:'admin-queue'});
+  click('', {adminService:created.id});
+  assert.match(app.innerHTML,/No one is waiting/);
+  assert.deepEqual(adminQueue(created.id), []);
+  assert.equal(serveNextUser(created.id), null);
+  assert.equal(removeQueueUser(created.id,'missing'), null);
+  assert.equal(moveQueueUser(created.id,'missing','up'), null);
 
-    click('', {page:'admin-services'});
-    click('', {action:'edit-service',serviceId:edited.id});
-    assert.match(app.innerHTML,/value="Academic Advising"/);
-    submitServiceForm({...validService,name:' Updated Advising ',priority:'low'});
-    assert.equal(SERVICES[0], edited);
-    assert.deepEqual(edited, {...original,name:'Updated Advising',description:'Help with questions.',expectedDuration:12.5,priority:'low'});
-    assert.equal(state.toast, 'Service updated.');
-    assert.match(app.innerHTML,/Updated Advising/);
+  click('', {page:'admin-services'});
+  click('', {action:'edit-service',serviceId:editedId});
+  assert.match(app.innerHTML,/value="Academic Advising"/);
+  await submitServiceForm({...validService,name:' Updated Advising ',priority:'low'});
+  const updated = SERVICES.find(service => service.id === editedId);
+  assert.equal(updated.name, 'Updated Advising');
+  assert.equal(updated.priority, 'low');
+  assert.equal(state.toast, 'Service updated.');
+  assert.match(app.innerHTML,/Updated Advising/);
 
-    click('logout');
-    handlers.submit({target:{id:'auth-form',elements:{email:{value:'demo@example.com'},password:{value:'password123'}}},preventDefault(){}});
-    click('', {quickjoin:created.id});
-    assert.match(app.innerHTML,/New Service/);
-    click('join-button');
-    assert.match(app.innerHTML,/Your queue progress/);
-    click('advance');
-    assert.match(app.innerHTML,/Served/);
-    assert.match(app.innerHTML,/New Service/);
-  } finally {
-    Object.assign(edited,original);
-    SERVICES.splice(originalLength);
-    state.toast = null;
-    click('logout');
-    assert.equal(JSON.stringify(SERVICES),before);
-  }
+  await click('logout');
+  await handlers.submit({target:{id:'auth-form',elements:{email:{value:'demo@example.com'},password:{value:'password123'}}},preventDefault(){}});
+  click('', {quickjoin:created.id});
+  assert.match(app.innerHTML,/New Service/);
+  click('join-button');
+  assert.match(app.innerHTML,/Your queue progress/);
+  click('advance');
+  assert.match(app.innerHTML,/Served/);
+  assert.match(app.innerHTML,/New Service/);
+  await click('logout');
 });

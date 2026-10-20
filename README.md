@@ -2,7 +2,7 @@
 
 QueueSmart is a front-end prototype for joining and managing service queues. This project was developed for COSC 4353 - Software Design
 
-The prototype includes user account screens, queue interactions, and an admin view for monitoring services and managing waiting queues. Queue and service data are simulated in the browser; this project does not currently connect to a production backend or database.
+The prototype includes user account screens, queue interactions, and an admin view for monitoring services and managing waiting queues. Authentication and service management run on an in-memory Node API. Queue participation, wait simulation, and admin mock lines are still handled in the browser until those A3 modules are added. There is no production database.
 
 ## Features
 
@@ -20,17 +20,16 @@ The prototype includes user account screens, queue interactions, and an admin vi
 - Open or close a service queue
 - View the queue for a selected service
 - Change the order of people waiting, remove a person, or serve the next person
-
-The Service Management screen is currently a placeholder.
+- Create and edit services (name, description, expected duration, priority)
 
 ## Technology
 
 - HTML
 - CSS
 - JavaScript ES modules
-- Node.js built-in HTTP server
+- Node.js HTTP server with REST APIs (`/api/auth/*`, `/api/services`)
 
-The prototype stores account and application data in the browser. Queue activity and service behavior are simulated.
+Accounts and services are stored in server memory (reset when the process stops). Queue activity for students and the admin mock line are still simulated in the browser.
 
 ## Run locally
 
@@ -48,4 +47,11 @@ Then open in http://localhost:8000/
 5. History records served and left queues. Leaving prompts for confirmation.
 6. The bell opens in-app notifications; **Mark all read** updates the unread count.
 
-Email format, required fields, maximum lengths, password length, and confirmation are validated in the browser. Data is stored in this browser only. Services, waits, and movement are mocked.
+Email format, required fields, maximum lengths, password length, and confirmation are validated in the browser and again on the server. Restarting `npm start` clears backend accounts and services (the seeded admin is recreated).
+
+## Tests
+
+```bash
+npm test
+npm run test:coverage
+```

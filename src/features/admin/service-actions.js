@@ -1,30 +1,14 @@
 import {state} from '../../shared/state.js';
-import {isAdmin, saveService} from '../../data/store.js';
+import {validateService} from '../../shared/validate.js';
+import {isAdmin} from '../../data/store.js';
+import {ApiError, api, refreshServices} from '../../data/api.js';
+import {serviceById} from '../../data/services.js';
 
-export function validateService(values) {
-  const name = values.name.trim();
-  const description = values.description.trim();
-  const expectedDuration = Number(values.expectedDuration);
-  const priority = values.priority;
-  const errors = {};
+export {validateService};
 
-  if (!name) errors.name = 'Enter a service name.';
-  else if (name.length > 100) errors.name = 'Service name must be 100 characters or fewer.';
-  if (!description) errors.description = 'Enter a description.';
-  if (!Number.isFinite(expectedDuration) || expectedDuration <= 0) {
-    errors.expectedDuration = 'Enter a number of minutes greater than zero.';
-  }
-  if (!['low', 'medium', 'high'].includes(priority)) {
-    errors.priority = 'Choose low, medium, or high priority.';
-  }
-
-  return {values: {name, description, expectedDuration, priority}, errors};
-}
-
-export function submitService(form, {render, toast}) {
+export async function submitService(form, {render, toast}) {
   if (!isAdmin() || !state.serviceForm) return;
 
-  // Keep the original input strings separate from the trimmed values we save.
   const values = Object.fromEntries(
     ['name', 'description', 'expectedDuration', 'priority'].map(key => [key, form.elements[key].value])
   );
@@ -39,11 +23,41 @@ export function submitService(form, {render, toast}) {
   }
 
   const editing = state.serviceForm.id !== null;
-  const saved = saveService(state.serviceForm.id, result.values);
-  if (!saved) {
-    toast('This service no longer exists. Cancel and reopen the form.');
+  try {
+    if (editing) {
+      await api(`/api/services/${encodeURIComponent(state.serviceForm.id)}`, {method:'PUT', body: result.values});
+    } else {
+      await api('/api/services', {method:'POST', body: result.values});
+    }
+    await refreshServices();
+    state.serviceForm = null;
+    toast(editing ? 'Service updated.' : 'Service created.');
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      toast('This service no longer exists. Cancel and reopen the form.');
+      return;
+    }
+    if (error instanceof ApiError && error.fields) {
+      state.serviceForm.errors = error.fields;
+      render();
+      return;
+    }
+    toast(error instanceof ApiError ? error.message : 'Could not save the service.');
+  }
+}
+
+export async function toggleService(id, {render, toast}) {
+  if (!isAdmin()) return;
+  const service = serviceById(id);
+  if (!service) {
+    toast('This service no longer exists.');
     return;
   }
-  state.serviceForm = null;
-  toast(editing ? 'Service updated.' : 'Service created.');
+  try {
+    await api(`/api/services/${encodeURIComponent(id)}`, {method:'PUT', body:{open: !service.open}});
+    await refreshServices();
+    render();
+  } catch (error) {
+    toast(error instanceof ApiError ? error.message : 'Could not update the service.');
+  }
 }

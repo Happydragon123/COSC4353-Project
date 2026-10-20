@@ -73,7 +73,7 @@ function serviceForm() {
   return `
     <section class="card admin-service-form" aria-labelledby="service-form-title">
       <h2 id="service-form-title">${editing ? 'Edit Service' : 'Create Service'}</h2>
-      <p class="muted" id="service-form-note">Changes last until this page is refreshed.</p>
+      <p class="muted" id="service-form-note">Changes are stored on the server until it restarts.</p>
       <form id="service-form" novalidate aria-describedby="service-form-note">
         <div class="field">
           <label for="service-name">Service Name</label>

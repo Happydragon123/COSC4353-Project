@@ -1,0 +1,114 @@
+import {createHash, randomBytes} from 'node:crypto';
+import {DEMO_ADMIN} from '../shared/demo.js';
+
+const DEFAULT_SERVICES = [
+  {id:'advising', expectedDuration:20, priority:'medium', name:'Academic Advising', description:'Course planning, degree checks, and academic questions.', icon:'▤', wait:18, length:4, open:true},
+  {id:'financial', expectedDuration:30, priority:'high', name:'Financial Aid', description:'Get help with funding, awards, and account questions.', icon:'$', wait:32, length:7, open:true},
+  {id:'tech', expectedDuration:15, priority:'medium', name:'IT Help Desk', description:'Account access, devices, software, and campus Wi-Fi.', icon:'⌘', wait:12, length:3, open:true},
+  {id:'records', expectedDuration:10, priority:'low', name:'Student Records', description:'Transcripts, enrollment verification, and records.', icon:'▦', wait:0, length:0, open:false}
+];
+
+let users = [];
+let sessions = new Map();
+let services = [];
+
+export function hashPassword(password, salt = randomBytes(16).toString('hex')) {
+  const hash = createHash('sha256').update(`${salt}:${password}`).digest('hex');
+  return {salt, hash};
+}
+
+export function passwordMatches(password, user) {
+  return hashPassword(password, user.salt).hash === user.hash;
+}
+
+export function publicUser(user) {
+  return {id: user.id, name: user.name, email: user.email, role: user.role};
+}
+
+export function publicService(service) {
+  return {
+    id: service.id,
+    name: service.name,
+    description: service.description,
+    expectedDuration: service.expectedDuration,
+    priority: service.priority,
+    icon: service.icon,
+    wait: service.wait,
+    length: service.length,
+    open: service.open
+  };
+}
+
+export function resetMemory() {
+  users = [];
+  sessions = new Map();
+  services = DEFAULT_SERVICES.map(service => ({...service}));
+  const {salt, hash} = hashPassword(DEMO_ADMIN.password);
+  users.push({
+    id: 'user-admin',
+    name: DEMO_ADMIN.name,
+    email: DEMO_ADMIN.email,
+    role: 'admin',
+    salt,
+    hash
+  });
+}
+
+resetMemory();
+
+export function findUserByEmail(email) {
+  return users.find(user => user.email === email) || null;
+}
+
+export function findUserById(id) {
+  return users.find(user => user.id === id) || null;
+}
+
+export function addUser({name, email, password, role = 'user'}) {
+  const {salt, hash} = hashPassword(password);
+  const user = {id: `user-${randomBytes(8).toString('hex')}`, name, email, role, salt, hash};
+  users.push(user);
+  return user;
+}
+
+export function createSession(user) {
+  const token = randomBytes(24).toString('hex');
+  const session = {token, userId: user.id, name: user.name, email: user.email, role: user.role};
+  sessions.set(token, session);
+  return session;
+}
+
+export function getSession(token) {
+  if (!token) return null;
+  const session = sessions.get(token);
+  if (!session) return null;
+  const user = findUserById(session.userId);
+  return user ? session : null;
+}
+
+export function deleteSession(token) {
+  return sessions.delete(token);
+}
+
+export function listServices() {
+  return services.map(publicService);
+}
+
+export function findServiceById(id) {
+  return services.find(service => service.id === id) || null;
+}
+
+export function addService(details) {
+  let id;
+  do { id = `service-${randomBytes(8).toString('hex')}`; } while (findServiceById(id));
+  const service = {id, icon:'▤', wait:0, length:0, open:true, ...details};
+  services.push(service);
+  return service;
+}
+
+export function updateServiceRecord(id, details) {
+  const service = findServiceById(id);
+  if (!service) return null;
+  Object.assign(service, details);
+  return service;
+}
