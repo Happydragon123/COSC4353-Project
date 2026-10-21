@@ -41,6 +41,13 @@ Accounts, services, and API queue entries are stored in server memory and reset 
 
 Queue entries are ordered by priority first and arrival order second. A user can wait in only one queue at a time.
 
+Queue API entries include `estimate`, the estimated minutes until that user's turn:
+`Math.ceil((position - 1) * expectedDuration)`. The first person has a zero-minute
+wait. Estimates assume one service counter and are recalculated on each request
+using the current priority order and service duration. Service responses derive
+`length` from the actual queue and `wait` from the total time to serve that queue.
+The existing browser queue simulation remains separate from these queue APIs.
+
 ## Run locally
 
 Install Node.js, then run these commands from the project directory:

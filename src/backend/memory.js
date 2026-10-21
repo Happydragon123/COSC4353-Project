@@ -1,5 +1,6 @@
 import {createHash, randomBytes} from 'node:crypto';
 import {DEMO_ADMIN} from '../shared/demo.js';
+import {estimateWaitMinutes} from './wait-time.js';
 
 const DEFAULT_SERVICES = [
   {id:'advising', expectedDuration:20, priority:'medium', name:'Academic Advising', description:'Course planning, degree checks, and academic questions.', icon:'▤', wait:18, length:4, open:true},
@@ -28,6 +29,7 @@ export function publicUser(user) {
 }
 
 export function publicService(service) {
+  const length = queueForService(service.id).length;
   return {
     id: service.id,
     name: service.name,
@@ -35,8 +37,8 @@ export function publicService(service) {
     expectedDuration: service.expectedDuration,
     priority: service.priority,
     icon: service.icon,
-    wait: service.wait,
-    length: service.length,
+    wait: estimateWaitMinutes(length + 1, service.expectedDuration),
+    length,
     open: service.open
   };
 }

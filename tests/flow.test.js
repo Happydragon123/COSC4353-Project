@@ -27,7 +27,7 @@ const app=elements.app;
 const click=(id,dataset={})=>handlers.click({target:{closest:()=>({id,dataset})}});
 const form={elements:{name:{value:'Demo Student'},email:{value:'demo@example.com'},password:{value:'password123'},confirm:{value:'password123'}}};
 
-test('register, join, receive queue update, leave, and review history', async ()=>{
+test('register, join, receive join notification, leave, and review history', async ()=>{
   click('',{auth:'register'});
   await handlers.submit({target:{id:'auth-form',...form},preventDefault(){}});
   assert.match(app.innerHTML,/Available services/);
@@ -35,9 +35,8 @@ test('register, join, receive queue update, leave, and review history', async ()
   assert.match(app.innerHTML,/Join this queue/);
   click('join-button');
   assert.match(app.innerHTML,/Your queue progress/);
-  click('advance');
   click('bell');
-  assert.match(app.innerHTML,/Queue update/);
+  assert.match(app.innerHTML,/You joined the/);
   click('leave');
   click('confirm-leave');
   assert.match(app.innerHTML,/Left queue/);
@@ -166,5 +165,59 @@ test('create and edit services through delegated events and use new IDs in queue
   click('advance');
   assert.match(app.innerHTML,/Served/);
   assert.match(app.innerHTML,/New Service/);
+  await click('logout');
+});
+
+test('existing queue simulation still advances, notifies, and records served history', async () => {
+  for (let index = 0; index < 3; index++) {
+    const registered = handleApi({
+      method: 'POST',
+      pathname: '/api/auth/register',
+      body: {
+        name: `Waiting Student ${index}`,
+        email: `waiting${index}@example.com`,
+        password: 'password123',
+        confirm: 'password123'
+      }
+    });
+    assert.equal(registered.status, 201);
+    const joined = handleApi({
+      method: 'POST',
+      pathname: '/api/queues/advising',
+      headers: {authorization: `Bearer ${registered.body.token}`},
+      body: {}
+    });
+    assert.equal(joined.status, 201);
+  }
+
+  await handlers.submit({
+    target: {
+      id: 'auth-form',
+      elements: {
+        email: {value: 'demo@example.com'},
+        password: {value: 'password123'}
+      }
+    },
+    preventDefault() {}
+  });
+
+  const {currentData} = await import('../src/data/store.js');
+  click('', {quickjoin: 'advising'});
+  click('join-button');
+  assert.equal(currentData().queue.position, 4);
+
+  click('advance');
+  assert.equal(currentData().queue.position, 3);
+  assert.match(currentData().notifications[0].text, /Queue update/);
+
+  click('advance');
+  assert.equal(currentData().queue.position, 2);
+  assert.match(currentData().notifications[0].text, /Almost ready/);
+
+  click('advance');
+  click('advance');
+  assert.equal(currentData().queue, null);
+  assert.equal(currentData().history[0].outcome, 'Served');
+  assert.match(app.innerHTML, /Served/);
   await click('logout');
 });

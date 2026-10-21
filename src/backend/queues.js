@@ -1,14 +1,14 @@
 import {randomBytes} from 'node:crypto';
 import {requireAdmin, requireAuth} from './auth.js';
 import {HttpError, json} from './errors.js';
+import {estimateWaitMinutes} from './wait-time.js';
 import {
   addQueueEntry,
   allQueueEntries,
   findServiceById,
   findUserById,
   queueForService,
-  removeQueueEntry,
-  updateServiceRecord
+  removeQueueEntry
 } from './memory.js';
 
 const PRIORITY = {low: 0, normal: 1, medium: 1, high: 2};
@@ -27,6 +27,7 @@ function orderedQueue(serviceId) {
 
 function publicEntry(entry, position) {
   const user = findUserById(entry.userId);
+  const service = serviceOrThrow(entry.serviceId);
   return {
     id: entry.id,
     serviceId: entry.serviceId,
@@ -35,17 +36,9 @@ function publicEntry(entry, position) {
     email: user?.email ?? '',
     priority: entry.priority,
     joinedAt: entry.joinedAt,
-    position
+    position,
+    estimate: estimateWaitMinutes(position, service.expectedDuration)
   };
-}
-
-function syncServiceStats(serviceId) {
-  const service = findServiceById(serviceId);
-  const length = queueForService(serviceId).length;
-  updateServiceRecord(serviceId, {
-    length,
-    wait: length ? Math.ceil(length * service.expectedDuration) : 0
-  });
 }
 
 function parsePriority(body) {
@@ -54,7 +47,7 @@ function parsePriority(body) {
     throw new HttpError(400, 'Request body must be a JSON object.');
   }
   const priority = body.priority ?? 'normal';
-  if (typeof priority !== 'string' || !(priority in PRIORITY)) {
+  if (typeof priority !== 'string' || !Object.hasOwn(PRIORITY, priority)) {
     throw new HttpError(400, 'Priority must be low, normal, medium, or high.', {
       priority: 'Choose low, normal, medium, or high.'
     });
@@ -78,7 +71,6 @@ export function joinQueue(token, serviceId, body) {
     priority: parsePriority(body),
     joinedAt: new Date().toISOString()
   });
-  syncServiceStats(serviceId);
   const queue = orderedQueue(serviceId);
   return json(201, {entry: publicEntry(entry, queue.indexOf(entry) + 1)});
 }
@@ -88,7 +80,6 @@ export function leaveQueue(token, serviceId) {
   serviceOrThrow(serviceId);
   const entry = removeQueueEntry(serviceId, session.userId);
   if (!entry) throw new HttpError(404, 'You are not waiting in this queue.');
-  syncServiceStats(serviceId);
   return {status: 204, body: null};
 }
 
@@ -114,6 +105,5 @@ export function serveNext(token, serviceId) {
   const next = orderedQueue(serviceId)[0];
   if (!next) throw new HttpError(409, 'There is no one waiting in this queue.');
   removeQueueEntry(serviceId, next.userId);
-  syncServiceStats(serviceId);
   return json(200, {served: publicEntry(next, 1)});
 }
