@@ -29,7 +29,17 @@ The prototype includes user account screens, queue interactions, and an admin vi
 - JavaScript ES modules
 - Node.js HTTP server with REST APIs (`/api/auth/*`, `/api/services`)
 
-Accounts and services are stored in server memory (reset when the process stops). Queue activity for students and the admin mock line are still simulated in the browser.
+Accounts, services, and API queue entries are stored in server memory and reset when the process stops. The current front-end queue screens still use their Assignment 2 browser simulation.
+
+### Queue API
+
+- `POST /api/queues/:serviceId` — join an open queue (`priority` may be `low`, `normal`, `medium`, or `high`)
+- `DELETE /api/queues/:serviceId` — leave a queue
+- `GET /api/queue/me` — retrieve the signed-in user's active queue entry and position
+- `GET /api/queues/:serviceId` — view an ordered queue (administrator only)
+- `POST /api/queues/:serviceId/serve` — serve and remove the next user (administrator only)
+
+Queue entries are ordered by priority first and arrival order second. A user can wait in only one queue at a time.
 
 ## Run locally
 

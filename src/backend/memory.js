@@ -11,6 +11,8 @@ const DEFAULT_SERVICES = [
 let users = [];
 let sessions = new Map();
 let services = [];
+let queues = new Map();
+let queueSequence = 0;
 
 export function hashPassword(password, salt = randomBytes(16).toString('hex')) {
   const hash = createHash('sha256').update(`${salt}:${password}`).digest('hex');
@@ -43,6 +45,8 @@ export function resetMemory() {
   users = [];
   sessions = new Map();
   services = DEFAULT_SERVICES.map(service => ({...service}));
+  queues = new Map(DEFAULT_SERVICES.map(service => [service.id, []]));
+  queueSequence = 0;
   const {salt, hash} = hashPassword(DEMO_ADMIN.password);
   users.push({
     id: 'user-admin',
@@ -103,6 +107,7 @@ export function addService(details) {
   do { id = `service-${randomBytes(8).toString('hex')}`; } while (findServiceById(id));
   const service = {id, icon:'▤', wait:0, length:0, open:true, ...details};
   services.push(service);
+  queues.set(id, []);
   return service;
 }
 
@@ -111,4 +116,25 @@ export function updateServiceRecord(id, details) {
   if (!service) return null;
   Object.assign(service, details);
   return service;
+}
+
+export function queueForService(serviceId) {
+  if (!queues.has(serviceId)) queues.set(serviceId, []);
+  return queues.get(serviceId);
+}
+
+export function allQueueEntries() {
+  return [...queues.values()].flat();
+}
+
+export function addQueueEntry(entry) {
+  const record = {...entry, sequence: queueSequence++};
+  queueForService(entry.serviceId).push(record);
+  return record;
+}
+
+export function removeQueueEntry(serviceId, userId) {
+  const queue = queueForService(serviceId);
+  const index = queue.findIndex(entry => entry.userId === userId);
+  return index < 0 ? null : queue.splice(index, 1)[0];
 }
