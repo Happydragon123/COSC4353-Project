@@ -28,17 +28,17 @@ const click=(id,dataset={})=>handlers.click({target:{closest:()=>({id,dataset})}
 const form={elements:{name:{value:'Demo Student'},email:{value:'demo@example.com'},password:{value:'password123'},confirm:{value:'password123'}}};
 
 test('register, join, receive join notification, leave, and review history', async ()=>{
-  click('',{auth:'register'});
+  await click('',{auth:'register'});
   await handlers.submit({target:{id:'auth-form',...form},preventDefault(){}});
   assert.match(app.innerHTML,/Available services/);
-  click('',{page:'join'});
+  await click('',{page:'join'});
   assert.match(app.innerHTML,/Join this queue/);
-  click('join-button');
+  await click('join-button');
   assert.match(app.innerHTML,/Your queue progress/);
-  click('bell');
+  await click('bell');
   assert.match(app.innerHTML,/You joined the/);
-  click('leave');
-  click('confirm-leave');
+  await click('leave');
+  await click('confirm-leave');
   assert.match(app.innerHTML,/Left queue/);
   await click('logout');
   assert.match(app.innerHTML,/Log in/);
@@ -55,11 +55,14 @@ test('seeded admin lands on the admin portal', async ()=>{
 test('admin can manage a service queue', async () => {
   const adminForm = {elements: {email: {value: 'admin@queuesmart.local'}, password: {value:'admin1234'}}};
   await handlers.submit({target: {id: 'auth-form', ...adminForm}, preventDefault() {}});
-  click('', {page: 'admin-queue'});
+  await click('', {page: 'admin-queue'});
   assert.match(app.innerHTML, /Queue Management/);
-  assert.match(app.innerHTML, /Mock User 1/);
-  click('', {action: 'serve-next', serviceId: 'advising'});
-  assert.doesNotMatch(app.innerHTML, /mockuser1@example.com/);
+  const registered = handleApi({method:'POST',pathname:'/api/auth/register',body:{name:'Queue Visitor',email:'visitor@example.com',password:'password123',confirm:'password123'}});
+  handleApi({method:'POST',pathname:'/api/queues/advising',headers:{authorization:`Bearer ${registered.body.token}`},body:{}});
+  await click('', {page:'admin-queue'});
+  assert.match(app.innerHTML, /Queue Visitor/);
+  await click('', {action: 'serve-next', serviceId: 'advising'});
+  assert.doesNotMatch(app.innerHTML, /visitor@example.com/);
   await click('logout');
   assert.match(app.innerHTML, /Log in/);
 });
@@ -68,7 +71,7 @@ const {SERVICES} = await import('../src/data/services.js');
 const {state} = await import('../src/shared/state.js');
 const {validateService} = await import('../src/features/admin/service-actions.js');
 const {adminQueue} = await import('../src/data/store.js');
-const {serveNextUser, removeQueueUser, moveQueueUser} = await import('../src/features/admin/queue-actions.js');
+const {serveNextUser} = await import('../src/features/admin/queue-actions.js');
 const validService = {name:' New Service ', description:' Help with questions. ', expectedDuration:'12.5', priority:'high'};
 const serviceForm = values => ({id:'service-form', elements:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,{value}]))});
 const submitServiceForm = values => handlers.submit({target:serviceForm(values),preventDefault(){}});
@@ -98,8 +101,8 @@ test('service validation handles blanks, name limits, durations, and priority', 
 
 test('invalid service inputs remain visible and cancel leaves data unchanged', async () => {
   await loginAdmin();
-  click('', {page:'admin-services'});
-  click('', {action:'edit-service',serviceId:'advising'});
+  await click('', {page:'admin-services'});
+  await click('', {action:'edit-service',serviceId:'advising'});
   const before = JSON.stringify(SERVICES);
   const values = {name:'  Changed name  ',description:'   ',expectedDuration:'-2',priority:'high'};
   await submitServiceForm(values);
@@ -109,7 +112,7 @@ test('invalid service inputs remain visible and cancel leaves data unchanged', a
   assert.match(app.innerHTML,/Enter a description/);
   assert.match(app.innerHTML,/number of minutes greater than zero/);
   assert.match(app.innerHTML,/aria-invalid="true"/);
-  click('', {action:'cancel-service-form'});
+  await click('', {action:'cancel-service-form'});
   assert.equal(state.serviceForm, null);
   assert.equal(JSON.stringify(SERVICES), before);
   await click('logout');
@@ -117,11 +120,11 @@ test('invalid service inputs remain visible and cancel leaves data unchanged', a
 
 test('create and edit services through delegated events and use new IDs in queue screens', async () => {
   await loginAdmin();
-  click('', {page:'admin-services'});
+  await click('', {page:'admin-services'});
   const originalLength = SERVICES.length;
   const storedBefore = new Map(memory);
   const editedId = SERVICES[0].id;
-  click('', {action:'create-service'});
+  await click('', {action:'create-service'});
   assert.match(app.innerHTML,/type="submit">Save/);
   await submitServiceForm(validService);
   const created = SERVICES.at(-1);
@@ -133,21 +136,19 @@ test('create and edit services through delegated events and use new IDs in queue
   assert.equal(state.toast, 'Service created.');
   assert.deepEqual(memory, storedBefore);
 
-  click('', {action:'create-service'});
+  await click('', {action:'create-service'});
   await submitServiceForm({...validService,name:'Second service'});
   assert.notEqual(SERVICES.at(-1).id, created.id);
-  click('', {page:'admin-dashboard'});
+  await click('', {page:'admin-dashboard'});
   assert.match(app.innerHTML,/New Service/);
-  click('', {page:'admin-queue'});
-  click('', {adminService:created.id});
+  await click('', {page:'admin-queue'});
+  await click('', {adminService:created.id});
   assert.match(app.innerHTML,/No one is waiting/);
   assert.deepEqual(adminQueue(created.id), []);
-  assert.equal(serveNextUser(created.id), null);
-  assert.equal(removeQueueUser(created.id,'missing'), null);
-  assert.equal(moveQueueUser(created.id,'missing','up'), null);
+  await assert.rejects(serveNextUser(created.id), {status:409});
 
-  click('', {page:'admin-services'});
-  click('', {action:'edit-service',serviceId:editedId});
+  await click('', {page:'admin-services'});
+  await click('', {action:'edit-service',serviceId:editedId});
   assert.match(app.innerHTML,/value="Academic Advising"/);
   await submitServiceForm({...validService,name:' Updated Advising ',priority:'low'});
   const updated = SERVICES.find(service => service.id === editedId);
@@ -158,17 +159,19 @@ test('create and edit services through delegated events and use new IDs in queue
 
   await click('logout');
   await handlers.submit({target:{id:'auth-form',elements:{email:{value:'demo@example.com'},password:{value:'password123'}}},preventDefault(){}});
-  click('', {quickjoin:created.id});
+  await click('', {quickjoin:created.id});
   assert.match(app.innerHTML,/New Service/);
-  click('join-button');
+  await click('join-button');
   assert.match(app.innerHTML,/Your queue progress/);
-  click('advance');
+  const staff = handleApi({method:'POST',pathname:'/api/auth/login',body:{email:'admin@queuesmart.local',password:'admin1234'}}).body.token;
+  handleApi({method:'POST',pathname:`/api/queues/${created.id}/serve`,headers:{authorization:`Bearer ${staff}`}});
+  await click('', {page:'history'});
   assert.match(app.innerHTML,/Served/);
   assert.match(app.innerHTML,/New Service/);
   await click('logout');
 });
 
-test('existing queue simulation still advances, notifies, and records served history', async () => {
+test('server queue movement refreshes notifications and served history', async () => {
   for (let index = 0; index < 3; index++) {
     const registered = handleApi({
       method: 'POST',
@@ -202,20 +205,24 @@ test('existing queue simulation still advances, notifies, and records served his
   });
 
   const {currentData} = await import('../src/data/store.js');
-  click('', {quickjoin: 'advising'});
-  click('join-button');
+  await click('', {quickjoin: 'advising'});
+  await click('join-button');
   assert.equal(currentData().queue.position, 4);
 
-  click('advance');
+  const staff = handleApi({method:'POST',pathname:'/api/auth/login',body:{email:'admin@queuesmart.local',password:'admin1234'}}).body.token;
+  const serve = () => handleApi({method:'POST',pathname:'/api/queues/advising/serve',headers:{authorization:`Bearer ${staff}`}});
+  serve();
+  await click('refresh-queue');
   assert.equal(currentData().queue.position, 3);
-  assert.match(currentData().notifications[0].text, /Queue update/);
-
-  click('advance');
+  serve();
+  await click('refresh-queue');
   assert.equal(currentData().queue.position, 2);
   assert.match(currentData().notifications[0].text, /Almost ready/);
-
-  click('advance');
-  click('advance');
+  await click('mark-read');
+  assert.ok(currentData().notifications.every(n => n.read));
+  serve();
+  serve();
+  await click('', {page:'history'});
   assert.equal(currentData().queue, null);
   assert.equal(currentData().history[0].outcome, 'Served');
   assert.match(app.innerHTML, /Served/);

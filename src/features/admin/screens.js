@@ -212,48 +212,7 @@ export function queueManagement() {
             )}
           </td>
 
-          <td>
-            <div class="queue-actions">
-
-              <button
-                class="btn btn-outline btn-small"
-                data-action="queue-move"
-                data-direction="up"
-                data-service-id="${selectedService.id}"
-                data-user-id="${user.id}"
-                aria-label="Move ${escapeHTML(user.name)} up"
-                ${index === 0 ? 'disabled' : ''}
-              >
-                ↑
-              </button>
-
-              <button
-                class="btn btn-outline btn-small"
-                data-action="queue-move"
-                data-direction="down"
-                data-service-id="${selectedService.id}"
-                data-user-id="${user.id}"
-                aria-label="Move ${escapeHTML(user.name)} down"
-                ${
-                  index === queue.length - 1
-                    ? 'disabled'
-                    : ''
-                }
-              >
-                ↓
-              </button>
-
-              <button
-                class="btn btn-danger btn-small"
-                data-action="queue-remove"
-                data-service-id="${selectedService.id}"
-                data-user-id="${user.id}"
-              >
-                Remove
-              </button>
-
-            </div>
-          </td>
+          <td>${escapeHTML(user.priority)}</td>
         </tr>
       `;
     }).join('');
@@ -331,8 +290,8 @@ export function queueManagement() {
           </h2>
 
           <p class="muted">
-            Use the arrows to change queue order,
-            or remove a user from the queue.
+            Users are ordered by priority, then arrival time.
+            Serve the next user to complete their visit.
           </p>
         </div>
 
@@ -358,7 +317,7 @@ export function queueManagement() {
                     <th>Position</th>
                     <th>User</th>
                     <th>Joined</th>
-                    <th>Actions</th>
+                    <th>Priority</th>
                   </tr>
                 </thead>
 
@@ -390,8 +349,7 @@ export function queueManagement() {
       }
 
       <p class="muted admin-demo-note">
-        Queue users and actions are mock data for the
-        Assignment 2 front-end demonstration.
+        Queue updates come from the backend and refresh every five seconds.
       </p>
 
     </div>

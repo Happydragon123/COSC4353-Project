@@ -1,7 +1,7 @@
 import {state} from '../../shared/state.js';
 import {DEMO_ADMIN} from '../../shared/demo.js';
 import {validateAuth} from '../../shared/validate.js';
-import {ApiError, api, refreshServices} from '../../data/api.js';
+import {ApiError, api, refreshAccountData} from '../../data/api.js';
 import {session,setSession} from '../../data/store.js';
 
 export function authView(){const register=state.authPage==='register';return `<div class="auth"><section class="auth-left"><div class="brand"><span class="brand-mark">Q</span> Queue<b>Smart</b></div><div class="auth-content"><div class="eyebrow">Welcome to QueueSmart</div><h1>${register?'Create your account':'Less waiting. More doing.'}</h1><p class="muted">${register?'Join a queue from anywhere and stay informed every step of the way.':'Check wait times, join a queue, and know when it’s your turn.'}</p><form id="auth-form" novalidate><div id="form-error" role="alert"></div>${register?`<div class="field"><label for="name">Full name</label><input id="name" name="name" maxlength="80" autocomplete="name" required placeholder="Your full name"><span class="error" id="name-error"></span></div>`:''}<div class="field"><label for="email">Email address</label><input id="email" name="email" type="email" maxlength="254" autocomplete="email" required placeholder="you@example.com"><span class="error" id="email-error"></span></div><div class="field"><label for="password">Password</label><input id="password" name="password" type="password" minlength="8" maxlength="72" autocomplete="${register?'new-password':'current-password'}" required placeholder="${register?'At least 8 characters':'Enter your password'}"><span class="error" id="password-error"></span></div>${register?`<div class="field"><label for="confirm">Confirm password</label><input id="confirm" name="confirm" type="password" minlength="8" maxlength="72" autocomplete="new-password" required placeholder="Confirm your password"><span class="error" id="confirm-error"></span></div>`:''}<button class="btn btn-primary btn-block" type="submit">${register?'Create account':'Log in'} →</button></form><p class="auth-switch">${register?'Already have an account?':'New to QueueSmart?'} <button type="button" class="text-button" data-auth="${register?'login':'register'}">${register?'Log in':'Create an account'}</button></p><div class="demo-note">Demo: Create an account to explore the user screens, or log in as staff with ${DEMO_ADMIN.email} / ${DEMO_ADMIN.password}. Accounts live in the backend until the server restarts.</div></div></section><section class="auth-right"><div class="hero-copy"><div class="eyebrow" style="color:#9aebe0">A better way to wait</div><h2>Get in line.<br>Get on with life.</h2><p>One simple place to see available services, track your place, and receive timely updates.</p><div class="hero-mock"><div class="mock-top"><div><small class="muted">Your position</small><div class="mock-num">#4</div></div><span class="pill">● In queue</span></div><strong>Academic Advising</strong><div class="mock-line"></div><div class="mock-bottom"><span>Estimated wait: 18 min</span><span>Almost there</span></div></div></div></section></div>`}
@@ -36,7 +36,7 @@ export async function submitAuth(form,{render,toast}){
       : {email:values.email, password:values.password};
     const data = await api(path, {method:'POST', body});
     setSession({name:data.user.name, email:data.user.email, role:data.user.role, token:data.token});
-    await refreshServices();
+    await refreshAccountData();
     state.page = data.user.role === 'admin' ? 'admin-dashboard' : 'dashboard';
     render();
     if (register) toast('Welcome to QueueSmart!');
@@ -60,5 +60,5 @@ export async function logoutRemote() {
 export async function restoreSession() {
   const data = await api('/api/auth/me');
   setSession({...data.user, token: session().token});
-  await refreshServices();
+  await refreshAccountData();
 }

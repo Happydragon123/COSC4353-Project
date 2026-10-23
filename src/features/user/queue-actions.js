@@ -1,7 +1,28 @@
 import {state} from '../../shared/state.js';
-import {serviceById} from '../../data/services.js';
-import {currentData,updateData} from '../../data/store.js';
-function notify(data,text){data.notifications.unshift({id:Date.now()+Math.random(),text,time:new Date().toISOString(),read:false});data.notifications=data.notifications.slice(0,30)}
-export function joinQueue({navigate,toast}){const data=currentData();if(data.queue)return;const s=serviceById(state.selected);data.queue={serviceId:s.id,position:s.length+1,estimate:s.wait,joinedAt:new Date().toISOString(),status:'waiting'};notify(data,`You joined the ${s.name} queue. Your starting position is #${data.queue.position}.`);updateData(data);navigate('status');toast('You’ve joined the queue.')}
-export function advanceQueue({render,navigate,toast}){const data=currentData();if(!data.queue)return;const q=data.queue;if(q.position>1){q.position--;q.estimate=Math.max(0,q.estimate-5);if(q.position<=2){q.status='almost ready';notify(data,`Almost ready! You’re now #${q.position} in the ${serviceById(q.serviceId).name} queue.`)}else notify(data,`Queue update: you’re now #${q.position} in the ${serviceById(q.serviceId).name} queue.`);updateData(data);render()}else{data.history.unshift({...q,outcome:'Served',finishedAt:new Date().toISOString()});notify(data,`You’ve been served by ${serviceById(q.serviceId).name}. Thanks for visiting!`);data.queue=null;updateData(data);navigate('history');toast('Your visit is complete.')}}
-export function leaveQueue({navigate,toast}){const data=currentData();if(!data.queue)return;data.history.unshift({...data.queue,outcome:'Left queue',finishedAt:new Date().toISOString()});notify(data,`You left the ${serviceById(data.queue.serviceId).name} queue.`);data.queue=null;updateData(data);state.modal=null;navigate('history');toast('You’ve left the queue.')}
+import {currentData} from '../../data/store.js';
+import {ApiError, api, refreshAccountData} from '../../data/api.js';
+
+export async function joinQueue({navigate,toast}) {
+  try {
+    await api(`/api/queues/${encodeURIComponent(state.selected)}`, {method:'POST', body:{}});
+    await refreshAccountData();
+    await navigate('status');
+    toast('You’ve joined the queue.');
+  } catch (error) {
+    toast(error instanceof ApiError ? error.message : 'Could not join the queue. Try again.');
+  }
+}
+
+export async function leaveQueue({navigate,toast}) {
+  const queue = currentData().queue;
+  if (!queue) return;
+  try {
+    await api(`/api/queues/${encodeURIComponent(queue.serviceId)}`, {method:'DELETE'});
+    await refreshAccountData();
+    state.modal = null;
+    await navigate('history');
+    toast('You’ve left the queue.');
+  } catch (error) {
+    toast(error instanceof ApiError ? error.message : 'Could not leave the queue. Try again.');
+  }
+}

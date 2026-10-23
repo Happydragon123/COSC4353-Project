@@ -14,6 +14,8 @@ let sessions = new Map();
 let services = [];
 let queues = new Map();
 let queueSequence = 0;
+let notifications = new Map();
+let history = new Map();
 
 export function hashPassword(password, salt = randomBytes(16).toString('hex')) {
   const hash = createHash('sha256').update(`${salt}:${password}`).digest('hex');
@@ -49,6 +51,8 @@ export function resetMemory() {
   services = DEFAULT_SERVICES.map(service => ({...service}));
   queues = new Map(DEFAULT_SERVICES.map(service => [service.id, []]));
   queueSequence = 0;
+  notifications = new Map();
+  history = new Map();
   const {salt, hash} = hashPassword(DEMO_ADMIN.password);
   users.push({
     id: 'user-admin',
@@ -139,4 +143,29 @@ export function removeQueueEntry(serviceId, userId) {
   const queue = queueForService(serviceId);
   const index = queue.findIndex(entry => entry.userId === userId);
   return index < 0 ? null : queue.splice(index, 1)[0];
+}
+
+// Account-owned records are never accepted from clients. Return copies so callers
+// cannot change stored notifications or completed visit snapshots.
+export function addNotification(userId, details) {
+  const record = {id: `notification-${randomBytes(8).toString('hex')}`,
+    ...details, time: new Date().toISOString(), read: false};
+  notifications.set(userId, [record, ...(notifications.get(userId) || [])]);
+}
+
+export function notificationsForUser(userId) {
+  return (notifications.get(userId) || []).map(record => ({...record}));
+}
+
+export function markNotificationsRead(userId) {
+  for (const record of notifications.get(userId) || []) record.read = true;
+}
+
+export function addHistoryEntry(userId, details) {
+  const record = {...details, finishedAt: new Date().toISOString()};
+  history.set(userId, [record, ...(history.get(userId) || [])]);
+}
+
+export function historyForUser(userId) {
+  return (history.get(userId) || []).map(record => ({...record}));
 }

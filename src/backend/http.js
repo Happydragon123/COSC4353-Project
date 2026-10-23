@@ -1,3 +1,5 @@
+import {listNotifications, readAllNotifications} from './notifications.js';
+import {listHistory} from './history.js';
 import {currentUser, loginUser, logoutUser, registerUser} from './auth.js';
 import {HttpError, json} from './errors.js';
 import {createService, getService, listServicesForUser, updateService} from './services.js';
@@ -20,6 +22,9 @@ export function handleApi({method, pathname, headers = {}, body = null}) {
     const serviceMatch = pathname.match(/^\/api\/services\/([^/]+)$/);
     if (serviceMatch && method === 'GET') return getService(token, decodeURIComponent(serviceMatch[1]));
     if (serviceMatch && method === 'PUT') return updateService(token, decodeURIComponent(serviceMatch[1]), body);
+    if (method === 'GET' && pathname === '/api/notifications') return listNotifications(token);
+    if (method === 'POST' && pathname === '/api/notifications/read-all') return readAllNotifications(token);
+    if (method === 'GET' && pathname === '/api/history') return listHistory(token);
     if (method === 'GET' && pathname === '/api/queue/me') return getMyQueue(token);
     const queueMatch = pathname.match(/^\/api\/queues\/([^/]+)$/);
     if (queueMatch && method === 'GET') return viewQueue(token, decodeURIComponent(queueMatch[1]));

@@ -1,3 +1,5 @@
+import {notifyApproaching, notifyQueueEvent} from './notifications.js';
+import {recordVisit} from './history.js';
 import {randomBytes} from 'node:crypto';
 import {requireAdmin, requireAuth} from './auth.js';
 import {HttpError, json} from './errors.js';
@@ -72,14 +74,22 @@ export function joinQueue(token, serviceId, body) {
     joinedAt: new Date().toISOString()
   });
   const queue = orderedQueue(serviceId);
-  return json(201, {entry: publicEntry(entry, queue.indexOf(entry) + 1)});
+  const result = publicEntry(entry, queue.indexOf(entry) + 1);
+  notifyQueueEvent(entry, 'joined',
+    `You joined the ${service.name} queue. Your starting position is #${result.position}.`);
+  notifyApproaching(queue, service);
+  return json(201, {entry: result});
 }
 
 export function leaveQueue(token, serviceId) {
   const session = requireAuth(token);
-  serviceOrThrow(serviceId);
+  const service = serviceOrThrow(serviceId);
+  const queue = orderedQueue(serviceId);
   const entry = removeQueueEntry(serviceId, session.userId);
   if (!entry) throw new HttpError(404, 'You are not waiting in this queue.');
+  recordVisit(publicEntry(entry, queue.indexOf(entry) + 1), service, 'Left queue');
+  notifyQueueEvent(entry, 'left', `You left the ${service.name} queue.`);
+  notifyApproaching(orderedQueue(serviceId), service);
   return {status: 204, body: null};
 }
 
@@ -101,9 +111,13 @@ export function viewQueue(token, serviceId) {
 
 export function serveNext(token, serviceId) {
   requireAdmin(token);
-  serviceOrThrow(serviceId);
+  const service = serviceOrThrow(serviceId);
   const next = orderedQueue(serviceId)[0];
   if (!next) throw new HttpError(409, 'There is no one waiting in this queue.');
   removeQueueEntry(serviceId, next.userId);
-  return json(200, {served: publicEntry(next, 1)});
+  const served = publicEntry(next, 1);
+  recordVisit(served, service, 'Served');
+  notifyQueueEvent(next, 'served', `You’ve been served by ${service.name}. Thanks for visiting!`);
+  notifyApproaching(orderedQueue(serviceId), service);
+  return json(200, {served});
 }
