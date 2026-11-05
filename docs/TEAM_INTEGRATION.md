@@ -38,6 +38,8 @@ All six A3 modules are server APIs in `src/backend/`. The UI calls them through 
 | POST | `/api/auth/login` | public |
 | POST | `/api/auth/logout` | signed-in |
 | GET | `/api/auth/me` | signed-in |
+| GET | `/api/profile` | signed-in |
+| PUT | `/api/profile` | signed-in |
 | GET | `/api/services` | signed-in |
 | GET | `/api/services/:id` | signed-in |
 | POST | `/api/services` | admin |
@@ -67,5 +69,7 @@ Failed requests cannot create events; reads do not create duplicate notification
 Registration accepts `{name, email, password, confirm}`; login accepts `{email, password}`. Both return `{user: {id, name, email, role}, token}`. Names are required strings up to 80 characters, email addresses up to 254 characters, and passwords 8–72 characters. Registration requires matching confirmation. Email addresses are trimmed and normalized to lowercase. Use the seeded admin account listed in README; registration cannot grant admin access.
 
 Service creation requires `{name, description, expectedDuration, priority}`. Name and description are required strings limited to 100 and 500 characters. Duration is positive minutes (a number or numeric form string); priority is `low`, `medium`, or `high`. PUT accepts any subset of these fields plus boolean `open`, and requires at least one recognized field. Creation/update returns `{service}`; listing returns `{services}`. Queue counts and wait values are computed from real in-memory queue entries.
+
+Profiles return `{profile: {id, fullName, email, contactInfo, preferences}}`. `PUT /api/profile` accepts any subset of `fullName`, `contactInfo`, and `preferences`. Contact information is optional, preferences are stored as a JSON object, and email remains the immutable account reference.
 
 Errors return `{error, fields?}`: 400 for invalid fields or JSON, 401 for missing/invalid authentication, 403 for users attempting admin operations, 404 for unknown routes/services, and 409 for duplicate registration. Field errors map input names to messages. Run `npm test` or `npm run test:coverage`; API tests reset in-memory state between cases. The coverage report covers imported application files; the standalone HTTP listener is not included.

@@ -80,3 +80,33 @@ export function validateServicePatch(input = {}) {
   }
   return {values, errors};
 }
+
+export function validateUserProfile(input = {}) {
+  const errors = {};
+  const values = {};
+
+  if (Object.prototype.hasOwnProperty.call(input, 'fullName')) {
+    const fullName = String(input.fullName ?? '').trim();
+    if (typeof input.fullName !== 'string' || !fullName || fullName.length > 80) {
+      errors.fullName = 'Enter your full name (up to 80 characters).';
+    } else values.fullName = fullName;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'contactInfo')) {
+    if (input.contactInfo === null || input.contactInfo === '') values.contactInfo = null;
+    else if (typeof input.contactInfo !== 'string' || input.contactInfo.trim().length > 200) {
+      errors.contactInfo = 'Contact information must be 200 characters or fewer.';
+    } else values.contactInfo = input.contactInfo.trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'preferences')) {
+    const preferences = input.preferences;
+    if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) {
+      errors.preferences = 'Preferences must be an object.';
+    } else if (JSON.stringify(preferences).length > 2000) {
+      errors.preferences = 'Preferences are too large.';
+    } else values.preferences = structuredClone(preferences);
+  }
+  if (!Object.keys(values).length && !Object.keys(errors).length) {
+    errors.form = 'Provide at least one profile field to update.';
+  }
+  return {values, errors};
+}

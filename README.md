@@ -9,6 +9,7 @@ The prototype includes user account screens, queue interactions, and an admin vi
 ### User experience
 
 - Register, log in, and log out
+- Retrieve and update a user profile, including optional contact information and preferences
 - View the user dashboard and available services
 - Join a service queue and view queue status
 - Refresh queue status and receive automatic updates every five seconds
@@ -73,6 +74,13 @@ estimate, outcome, finishedAt}`. Completed visits have outcome `Served` or
 The position and estimate describe the visit at exit. Each rejoin creates a new
 visit; service names are saved at completion so later edits do not rewrite history.
 Notifications and history survive logout/login until the server restarts.
+
+### Profile API
+
+- `GET /api/profile` — retrieve the signed-in user's profile
+- `PUT /api/profile` — update `fullName`, optional `contactInfo`, and/or `preferences`
+
+The profile's email is an immutable reference to the authenticated account.
 
 ## Run locally
 

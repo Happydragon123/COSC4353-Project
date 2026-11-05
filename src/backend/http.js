@@ -4,6 +4,7 @@ import {currentUser, loginUser, logoutUser, registerUser} from './auth.js';
 import {HttpError, json} from './errors.js';
 import {createService, getService, listServicesForUser, updateService} from './services.js';
 import {getMyQueue, joinQueue, leaveQueue, serveNext, viewQueue} from './queues.js';
+import {editUserProfile, getUserProfile} from './profiles.js';
 
 function bearerToken(headers = {}) {
   const header = headers.authorization || headers.Authorization || '';
@@ -17,6 +18,8 @@ export function handleApi({method, pathname, headers = {}, body = null}) {
     if (method === 'POST' && pathname === '/api/auth/login') return loginUser(body);
     if (method === 'POST' && pathname === '/api/auth/logout') return logoutUser(token);
     if (method === 'GET' && pathname === '/api/auth/me') return currentUser(token);
+    if (method === 'GET' && pathname === '/api/profile') return getUserProfile(token);
+    if (method === 'PUT' && pathname === '/api/profile') return editUserProfile(token, body);
     if (method === 'GET' && pathname === '/api/services') return listServicesForUser(token);
     if (method === 'POST' && pathname === '/api/services') return createService(token, body);
     const serviceMatch = pathname.match(/^\/api\/services\/([^/]+)$/);

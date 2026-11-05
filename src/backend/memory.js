@@ -30,6 +30,16 @@ export function publicUser(user) {
   return {id: user.id, name: user.name, email: user.email, role: user.role};
 }
 
+export function publicUserProfile(user) {
+  return {
+    id: user.id,
+    fullName: user.name,
+    email: user.email,
+    contactInfo: user.contactInfo ?? null,
+    preferences: {...(user.preferences || {})}
+  };
+}
+
 export function publicService(service) {
   const length = queueForService(service.id).length;
   return {
@@ -58,6 +68,8 @@ export function resetMemory() {
     id: 'user-admin',
     name: DEMO_ADMIN.name,
     email: DEMO_ADMIN.email,
+    contactInfo: null,
+    preferences: {},
     role: 'admin',
     salt,
     hash
@@ -76,8 +88,26 @@ export function findUserById(id) {
 
 export function addUser({name, email, password, role = 'user'}) {
   const {salt, hash} = hashPassword(password);
-  const user = {id: `user-${randomBytes(8).toString('hex')}`, name, email, role, salt, hash};
+  const user = {
+    id: `user-${randomBytes(8).toString('hex')}`,
+    name,
+    email,
+    contactInfo: null,
+    preferences: {},
+    role,
+    salt,
+    hash
+  };
   users.push(user);
+  return user;
+}
+
+export function updateUserProfile(userId, details) {
+  const user = findUserById(userId);
+  if (!user) return null;
+  if (Object.prototype.hasOwnProperty.call(details, 'fullName')) user.name = details.fullName;
+  if (Object.prototype.hasOwnProperty.call(details, 'contactInfo')) user.contactInfo = details.contactInfo;
+  if (Object.prototype.hasOwnProperty.call(details, 'preferences')) user.preferences = {...details.preferences};
   return user;
 }
 
