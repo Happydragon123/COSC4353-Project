@@ -1,13 +1,12 @@
 # QueueSmart SQLite database
 
-`queuesmart.db` contains the account, profile, service, queue, and queue-entry
-schemas. Starting the backend initializes missing tables and seeds missing demo
-records. Existing records are preserved. Notification/history persistence remains
-team integration work.
+`queuesmart.db` contains the account, profile, service, queue, queue-entry, notification,
+and visit-history schemas. Starting the backend initializes missing tables and seeds
+missing demo records. Existing records are preserved.
 
 SQLite stores the database in a file; no separate database server is needed.
-The backend uses this file for accounts, profiles, services, and queue operations.
-Sessions, notification records, and history API snapshots still use memory.
+The backend uses this file for all application records, including notifications,
+read status, and history snapshots. Session tokens remain in memory.
 
 From the project root, open the database using the SQLite command-line tool:
 
@@ -160,6 +159,38 @@ Run `npm run test:coverage` for backend/UI tests. The restart test in
 `tests/queue-persistence.test.js` starts three independent Node processes with the
 same temporary database and verifies restored login, queue contents, service
 status, completion status, and foreign-key integrity. It also verifies that old
-session tokens do not survive restart. The history API and notifications still
-reset on restart, even though completed QueueEntry rows and the approaching flag
-persist; their separate durable records are outside this queue integration.
+session tokens do not survive restart. `tests/activity-persistence.test.js` verifies
+notification content and read status, history snapshots, profile edits, account
+isolation, schema validation, legacy upgrades, and complete rollback on failed
+activity writes. The coverage command enforces at least 80% line, branch, and
+function coverage for backend modules and shared validation.
+
+
+## Notification and history (assignment table 6)
+
+`007_notification_history.sql` is applied automatically after the queue migrations.
+It is also safe to rerun manually. `Notification` stores its ID, owning user and
+visit, message, creation timestamp, event type, and `sent`/`viewed` status.
+`VisitHistory` stores the visit owner, service-name snapshot, final position,
+estimated wait, outcome, and completion timestamp. QueueEntry supplies the
+original join time and priority, and Queue supplies the service reference.
+
+Both tables use STRICT types and composite foreign keys to the owning queue entry.
+Checks enforce required fields, message/name lengths, canonical timestamps,
+positive positions, nonnegative estimates, and valid event/outcome/status values.
+An event type can appear only once per visit. History triggers require a matching
+served/canceled QueueEntry. Each queue action saves queue changes, notifications,
+notification flags, and the completion snapshot in one transaction. Repository
+transactions use savepoints inside the outer action transaction.
+
+The existing notification and history API response shapes are preserved, including
+the frontend `read` boolean mapped from the database status. Read-all updates only
+the authenticated account. The existing screens already consume these API responses.
+
+On upgrade, already served/canceled QueueEntry rows are recovered into history.
+Their completion timestamps and estimate snapshots were never saved, so those two
+fields are `null`; the recovered service name is the current name at migration
+time. Original join times and outcomes remain available. New completions capture
+their actual completion time and service-name/estimate snapshots. Previously lost
+in-memory notification text and read state cannot be reconstructed. Only newly
+persisted notifications survive subsequent restarts.

@@ -47,7 +47,7 @@ All six A3 modules are server APIs in `src/backend/`. The UI calls them through 
 
 Queue and wait-time logic lives in `queues.js` and `wait-time.js`. Notification
 triggers live in `notifications.js`; completed-visit snapshots live in `history.js`.
-`memory.js` exposes the existing storage interface. Accounts, profiles, and services now use SQLite; queue storage lives in `queue-repository.js`. Sessions, notifications, and history API snapshots remain in memory. `resetMemory()` clears isolated in-memory test databases and refuses file-backed databases.
+`memory.js` exposes the existing storage interface. Accounts, profiles, and services now use SQLite; queue storage lives in `queue-repository.js`. Notifications and history snapshots use `activity-repository.js`; only sessions remain in memory. `resetMemory()` clears isolated in-memory test databases and refuses file-backed databases.
 See README for full queue/notification/history contracts.
 
 | Method | Path | Who |
@@ -72,7 +72,7 @@ Service creation requires `{name, description, expectedDuration, priority}`. Nam
 
 Profiles return `{profile: {id, fullName, email, contactInfo, preferences}}`. `PUT /api/profile` accepts any subset of `fullName`, `contactInfo`, and `preferences`. Contact information is optional, preferences are stored as a JSON object, and email remains the immutable account reference.
 
-Errors return `{error, fields?}`: 400 for invalid fields or JSON, 401 for missing/invalid authentication, 403 for users attempting admin operations, 404 for unknown routes/services, and 409 for duplicate registration. Field errors map input names to messages. Run `npm test` or `npm run test:coverage`; API tests reset isolated in-memory SQLite databases between cases; persistence tests use temporary files across fresh processes. The coverage report covers imported application files; the standalone HTTP listener is not included.
+Errors return `{error, fields?}`: 400 for invalid fields or JSON, 401 for missing/invalid authentication, 403 for users attempting admin operations, 404 for unknown routes/services, and 409 for duplicate registration. Field errors map input names to messages. Run `npm test` or `npm run test:coverage`; API tests reset isolated in-memory SQLite databases between cases; persistence tests use temporary files across fresh processes. The coverage report targets backend modules and shared validation, with an enforced 80% minimum for lines, branches, and functions; frontend files and the standalone HTTP listener are not included.
 
 
 ## A4 queue database integration
@@ -86,5 +86,8 @@ Queue persistence needs durable user/service references, so
 `003_queue_dependencies.sql` supplies supporting `UserProfile` and `Service`
 tables. Teammates implementing tables 2/3 should coordinate column definitions
 with this migration and the adapters in `memory.js`. Do not drop these tables or
-reset the application database during startup. Notifications/history persistence
-remains separate; see `database/README.md` for the schema contract and limitations.
+reset the application database during startup. `007_notification_history.sql` and
+`activity-repository.js` persist notifications, read state, and history snapshots.
+Queue actions include these writes in their transaction; nested repository calls
+use savepoints. Existing frontend response shapes are preserved. See
+`database/README.md` for upgrade behavior and legacy snapshot limitations.

@@ -4,6 +4,8 @@ import {queueForService} from './queue-repository.js';
 export {queueForService, allQueueEntries, addQueueEntry, removeQueueEntry} from './queue-repository.js';
 import {DEMO_ADMIN} from '../shared/demo.js';
 import {estimateWaitMinutes} from './wait-time.js';
+export {addNotification, notificationsForUser, markNotificationsRead,
+  addHistoryEntry, historyForUser} from './activity-repository.js';
 
 const DEFAULT_SERVICES = [
   {id:'advising', expectedDuration:20, priority:'medium', name:'Academic Advising', description:'Course planning, degree checks, and academic questions.', icon:'▤', wait:18, length:4, open:true},
@@ -13,8 +15,6 @@ const DEFAULT_SERVICES = [
 ];
 
 let sessions = new Map();
-let notifications = new Map();
-let history = new Map();
 
 export function hashPassword(password, salt = randomBytes(16).toString('hex')) {
   const hash = scryptSync(password, salt, 64).toString('hex');
@@ -89,11 +89,10 @@ function seedDefaults() {
 // Explicit test reset only; normal startup never deletes database records.
 export function resetMemory() {
   if (databasePath !== ':memory:') throw new Error('resetMemory requires an in-memory test database');
-  transaction(() => db.exec(`DELETE FROM QueueEntry; DELETE FROM Queue;
+  transaction(() => db.exec(`DELETE FROM Notification; DELETE FROM VisitHistory;
+    DELETE FROM QueueEntry; DELETE FROM Queue;
     DELETE FROM Service; DELETE FROM UserProfile; DELETE FROM UserCredentials;`));
   sessions = new Map();
-  notifications = new Map();
-  history = new Map();
   seedDefaults();
 }
 
@@ -177,28 +176,3 @@ export function updateServiceRecord(id, details) {
 }
 
 seedDefaults();
-
-// Account-owned records are never accepted from clients. Return copies so callers
-// cannot change stored notifications or completed visit snapshots.
-export function addNotification(userId, details) {
-  const record = {id: `notification-${randomBytes(8).toString('hex')}`,
-    ...details, time: new Date().toISOString(), read: false};
-  notifications.set(userId, [record, ...(notifications.get(userId) || [])]);
-}
-
-export function notificationsForUser(userId) {
-  return (notifications.get(userId) || []).map(record => ({...record}));
-}
-
-export function markNotificationsRead(userId) {
-  for (const record of notifications.get(userId) || []) record.read = true;
-}
-
-export function addHistoryEntry(userId, details) {
-  const record = {...details, finishedAt: new Date().toISOString()};
-  history.set(userId, [record, ...(history.get(userId) || [])]);
-}
-
-export function historyForUser(userId) {
-  return (history.get(userId) || []).map(record => ({...record}));
-}

@@ -2,14 +2,14 @@
 
 QueueSmart is a web application for joining and managing service queues. This project was developed for COSC 4353 - Software Design
 
-The prototype includes user account screens, queue interactions, and an admin view for monitoring services and managing waiting queues. The Node API persists accounts, profiles, services, queues, and queue entries in SQLite. The front end reads these API responses. Notifications and the history API currently use server memory.
+The prototype includes user account screens, queue interactions, and an admin view for monitoring services and managing waiting queues. The Node API persists accounts, profiles, services, queues, and queue entries in SQLite. The front end reads these API responses. Notifications, read status, and completed-visit history also persist in SQLite.
 
 ## Features
 
 ### User experience
 
 - Register, log in, and log out
-- Retrieve and update a user profile, including optional contact information and preferences
+- Retrieve and update a user profile through the backend API, including optional contact information and preferences
 - View the user dashboard and available services
 - Join a service queue and view queue status
 - Refresh queue status and receive automatic updates every five seconds
@@ -30,7 +30,7 @@ The prototype includes user account screens, queue interactions, and an admin vi
 - JavaScript ES modules
 - Node.js HTTP server with REST APIs (`/api/auth/*`, `/api/services`, `/api/queues/*`, `/api/notifications`, `/api/history`)
 
-Accounts, profiles, services, queue status, and all queue visits are stored in `database/queuesmart.db`. They survive server restarts. Sessions, notifications, and history API snapshots remain in memory; sign in again after restarting. Served/canceled entries remain in SQLite, but the history API still needs its separate database integration. The old A2 mock queue/history data is no longer read.
+Accounts, profiles, services, queue status, and all queue visits are stored in `database/queuesmart.db`. They survive server restarts. Only sessions remain in memory; sign in again after restarting. Notifications, read status, and history snapshots survive restarts. The old A2 mock queue/history data is no longer read.
 
 ### Queue API
 
@@ -73,7 +73,7 @@ estimate, outcome, finishedAt}`. Completed visits have outcome `Served` or
 `Left queue`; active participation remains available through `/api/queue/me`.
 The position and estimate describe the visit at exit. Each rejoin creates a new
 visit; service names are saved at completion so later edits do not rewrite history.
-Notifications and history survive logout/login until the server restarts.
+Notifications and history survive logout/login and server restarts. Queue mutations and their activity records commit together; failures roll back the entire action.
 
 ### Profile API
 
@@ -98,7 +98,7 @@ Then open in http://localhost:8000/
 5. History records served and left queues. Leaving prompts for confirmation.
 6. The bell opens in-app notifications; **Mark all read** updates the unread count.
 
-Email format, required fields, maximum lengths, password length, and confirmation are validated in the browser and again on the server. Restarting `npm start` preserves accounts and queues. The demo admin and default services are seeded only when missing; edits and queue open/closed status are preserved.
+Email format, required fields, maximum lengths, password length, and confirmation are validated in the browser and again on the server. Restarting `npm start` preserves accounts, profiles, services, queues, notifications, and history. The demo admin and default services are seeded only when missing; edits and queue open/closed status are preserved.
 
 ## Tests
 
@@ -109,8 +109,7 @@ npm run test:coverage
 
 Tests cover business rules, validation, priority/FIFO ordering, wait estimates,
 notification thresholds and deduplication, history snapshots, account isolation,
-logout/reset behavior, SQLite transactions, restart persistence, and frontend API flows. `npm run test:coverage` prints
-a coverage report; the standalone HTTP listener (`server.js`) is not included.
+logout/reset behavior, SQLite transactions, restart persistence, legacy upgrades, failed activity writes, and frontend API flows. `npm run test:coverage` runs all JavaScript tests and requires at least 80% line, branch, and function coverage for `src/backend/*.js` and the shared backend validation module. Frontend files, test files, and the standalone HTTP listener (`server.js`) are outside this backend coverage report.
 
 ## SQLite queue integration (A4 tables 4 and 5)
 
@@ -122,8 +121,8 @@ waiting users, and duplicate waiting positions.
 
 `database/003_queue_dependencies.sql` supplies the supporting user/profile and
 service storage needed for queue entries to remain usable after restart. Coordinate
-these columns with the teammates owning tables 2 and 3. Notifications/history
-persistence remains separate work. See [database setup](database/README.md).
+these columns with the teammates owning tables 2 and 3. Table 6 is implemented by
+`007_notification_history.sql` and `activity-repository.js`. See [database setup](database/README.md).
 
 To use a separate database for a demo:
 

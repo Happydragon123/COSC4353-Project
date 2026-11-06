@@ -156,7 +156,7 @@ test('invalid or conflicting operations create no notifications or history', () 
   assert.deepEqual(notes(token), finalNotes);
 });
 
-test('records survive logout and login but reset with server memory', () => {
+test('records survive logout and login; explicit test reset clears persisted activity', () => {
   let token = register();
   join(token); leave(token);
   api('POST','/api/notifications/read-all',token);

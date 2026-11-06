@@ -10,7 +10,7 @@ export const db = new DatabaseSync(databasePath);
 db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY) STRICT');
 for (const name of ['001_user_credentials.sql', '003_queue_dependencies.sql',
-  '004_queue.sql', '005_queue_entry.sql', '006_queue_runtime.sql']) {
+  '004_queue.sql', '005_queue_entry.sql', '006_queue_runtime.sql', '007_notification_history.sql']) {
   if (db.prepare('SELECT 1 FROM schema_migrations WHERE name = ?').get(name)) continue;
   // The runtime column may already exist in a manually initialized database.
   if (name !== '006_queue_runtime.sql' ||
@@ -20,14 +20,24 @@ for (const name of ['001_user_credentials.sql', '003_queue_dependencies.sql',
   db.prepare('INSERT INTO schema_migrations VALUES (?)').run(name);
 }
 
+// Queue actions and their repository calls share an atomic outer transaction.
+// Savepoints also allow a caller to recover from a failed nested operation.
+let savepointSequence = 0;
 export function transaction(work) {
-  db.exec('BEGIN IMMEDIATE');
+  const nested = db.isTransaction;
+  const savepoint = `queuesmart_${++savepointSequence}`;
+  db.exec(nested ? `SAVEPOINT ${savepoint}` : 'BEGIN IMMEDIATE');
   try {
     const result = work();
-    db.exec('COMMIT');
+    db.exec(nested ? `RELEASE SAVEPOINT ${savepoint}` : 'COMMIT');
     return result;
   } catch (error) {
-    db.exec('ROLLBACK');
+    if (nested) {
+      db.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+      db.exec(`RELEASE SAVEPOINT ${savepoint}`);
+    } else {
+      db.exec('ROLLBACK');
+    }
     throw error;
   }
 }

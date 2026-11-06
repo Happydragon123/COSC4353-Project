@@ -1,5 +1,6 @@
 """Queue schema tests use a minimal Service fixture until table #3 is delivered."""
 
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -123,9 +124,9 @@ class QueueTests(unittest.TestCase):
         self.db.commit()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'queue.db'
-            with sqlite3.connect(path) as stored:
+            with closing(sqlite3.connect(path)) as stored:
                 self.db.backup(stored)
-            with sqlite3.connect(path) as reopened:
+            with closing(sqlite3.connect(path)) as reopened:
                 self.assertEqual(reopened.execute(
                     'SELECT queue_id, user_id, position, status FROM QueueEntry').fetchone(),
                     ('q1', 'u1', 1, 'waiting'))

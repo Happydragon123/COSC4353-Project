@@ -5,6 +5,7 @@ import {requireAdmin, requireAuth} from './auth.js';
 import {HttpError, json} from './errors.js';
 import {estimateWaitMinutes} from './wait-time.js';
 import {serveNextEntry} from './queue-repository.js';
+import {transaction} from './database.js';
 import {
   addQueueEntry,
   allQueueEntries,
@@ -59,38 +60,42 @@ function parsePriority(body) {
 }
 
 export function joinQueue(token, serviceId, body) {
-  const session = requireAuth(token);
-  const service = serviceOrThrow(serviceId);
-  if (session.role === 'admin') throw new HttpError(403, 'Administrators cannot join a queue.');
-  if (!service.open) throw new HttpError(409, 'This queue is currently closed.');
-  if (allQueueEntries().some(entry => entry.userId === session.userId)) {
-    throw new HttpError(409, 'You are already waiting in a queue.');
-  }
+  return transaction(() => {
+    const session = requireAuth(token);
+    const service = serviceOrThrow(serviceId);
+    if (session.role === 'admin') throw new HttpError(403, 'Administrators cannot join a queue.');
+    if (!service.open) throw new HttpError(409, 'This queue is currently closed.');
+    if (allQueueEntries().some(entry => entry.userId === session.userId)) {
+      throw new HttpError(409, 'You are already waiting in a queue.');
+    }
 
-  const entry = addQueueEntry({
-    id: `queue-${randomBytes(8).toString('hex')}`,
-    serviceId,
-    userId: session.userId,
-    priority: parsePriority(body),
-    joinedAt: new Date().toISOString()
+    const entry = addQueueEntry({
+      id: `queue-${randomBytes(8).toString('hex')}`,
+      serviceId,
+      userId: session.userId,
+      priority: parsePriority(body),
+      joinedAt: new Date().toISOString()
+    });
+    const queue = orderedQueue(serviceId);
+    const result = publicEntry(entry, entry.position);
+    notifyQueueEvent(entry, 'joined',
+      `You joined the ${service.name} queue. Your starting position is #${result.position}.`);
+    notifyApproaching(queue, service);
+    return json(201, {entry: result});
   });
-  const queue = orderedQueue(serviceId);
-  const result = publicEntry(entry, entry.position);
-  notifyQueueEvent(entry, 'joined',
-    `You joined the ${service.name} queue. Your starting position is #${result.position}.`);
-  notifyApproaching(queue, service);
-  return json(201, {entry: result});
 }
 
 export function leaveQueue(token, serviceId) {
-  const session = requireAuth(token);
-  const service = serviceOrThrow(serviceId);
-  const entry = removeQueueEntry(serviceId, session.userId);
-  if (!entry) throw new HttpError(404, 'You are not waiting in this queue.');
-  recordVisit(publicEntry(entry, entry.position), service, 'Left queue');
-  notifyQueueEvent(entry, 'left', `You left the ${service.name} queue.`);
-  notifyApproaching(orderedQueue(serviceId), service);
-  return {status: 204, body: null};
+  return transaction(() => {
+    const session = requireAuth(token);
+    const service = serviceOrThrow(serviceId);
+    const entry = removeQueueEntry(serviceId, session.userId);
+    if (!entry) throw new HttpError(404, 'You are not waiting in this queue.');
+    recordVisit(publicEntry(entry, entry.position), service, 'Left queue');
+    notifyQueueEvent(entry, 'left', `You left the ${service.name} queue.`);
+    notifyApproaching(orderedQueue(serviceId), service);
+    return {status: 204, body: null};
+  });
 }
 
 export function getMyQueue(token) {
@@ -109,13 +114,15 @@ export function viewQueue(token, serviceId) {
 }
 
 export function serveNext(token, serviceId) {
-  requireAdmin(token);
-  const service = serviceOrThrow(serviceId);
-  const next = serveNextEntry(serviceId);
-  if (!next) throw new HttpError(409, 'There is no one waiting in this queue.');
-  const served = publicEntry(next, 1);
-  recordVisit(served, service, 'Served');
-  notifyQueueEvent(next, 'served', `You’ve been served by ${service.name}. Thanks for visiting!`);
-  notifyApproaching(orderedQueue(serviceId), service);
-  return json(200, {served});
+  return transaction(() => {
+    requireAdmin(token);
+    const service = serviceOrThrow(serviceId);
+    const next = serveNextEntry(serviceId);
+    if (!next) throw new HttpError(409, 'There is no one waiting in this queue.');
+    const served = publicEntry(next, 1);
+    recordVisit(served, service, 'Served');
+    notifyQueueEvent(next, 'served', `You’ve been served by ${service.name}. Thanks for visiting!`);
+    notifyApproaching(orderedQueue(serviceId), service);
+    return json(200, {served});
+  });
 }
