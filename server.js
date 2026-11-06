@@ -45,8 +45,19 @@ createServer(async (request, response) => {
     return;
   }
 
+  // Only public application assets may be served; database files contain credentials.
+  if (!(pathname === '/' || pathname === '/index.html' ||
+      /^\/src\/(?!backend\/).+\.js$/.test(pathname) || pathname.startsWith('/assets/'))) {
+    response.writeHead(404).end('Not found'); return;
+  }
   const file = resolve(root, `.${pathname === '/' ? '/index.html' : pathname}`);
   if (file !== root && !file.startsWith(root + sep)) {response.writeHead(403).end('Forbidden'); return;}
+  if (file !== resolve(root, 'index.html') &&
+      !file.startsWith(resolve(root, 'assets') + sep) &&
+      !(file.startsWith(resolve(root, 'src') + sep) &&
+        !file.startsWith(resolve(root, 'src/backend') + sep))) {
+    response.writeHead(404).end('Not found'); return;
+  }
   try {
     const body = await readFile(file);
     response.writeHead(200, {'Content-Type':mime[extname(file)] || 'application/octet-stream','X-Content-Type-Options':'nosniff'}).end(body);

@@ -1,8 +1,8 @@
 # QueueSmart
 
-QueueSmart is an in-memory web application for joining and managing service queues. This project was developed for COSC 4353 - Software Design
+QueueSmart is a web application for joining and managing service queues. This project was developed for COSC 4353 - Software Design
 
-The prototype includes user account screens, queue interactions, and an admin view for monitoring services and managing waiting queues. Authentication, services, queues, wait estimates, notifications, and history run on an in-memory Node API. The front end reads these API responses. No database is used.
+The prototype includes user account screens, queue interactions, and an admin view for monitoring services and managing waiting queues. The Node API persists accounts, profiles, services, queues, and queue entries in SQLite. The front end reads these API responses. Notifications and the history API currently use server memory.
 
 ## Features
 
@@ -30,7 +30,7 @@ The prototype includes user account screens, queue interactions, and an admin vi
 - JavaScript ES modules
 - Node.js HTTP server with REST APIs (`/api/auth/*`, `/api/services`, `/api/queues/*`, `/api/notifications`, `/api/history`)
 
-Accounts, services, queue entries, notifications, and history are stored in server memory and reset when the process stops. Only the session is stored in the browser; the old A2 mock queue/history data is no longer read.
+Accounts, profiles, services, queue status, and all queue visits are stored in `database/queuesmart.db`. They survive server restarts. Sessions, notifications, and history API snapshots remain in memory; sign in again after restarting. Served/canceled entries remain in SQLite, but the history API still needs its separate database integration. The old A2 mock queue/history data is no longer read.
 
 ### Queue API
 
@@ -84,7 +84,7 @@ The profile's email is an immutable reference to the authenticated account.
 
 ## Run locally
 
-Install Node.js, then run these commands from the project directory:
+Install Node.js 22.16+ (Node 24 recommended), then run from the project directory. SQLite uses Node’s built-in `node:sqlite` module; no npm dependencies or database server are required. Tables and demo records are initialized automatically without clearing existing records:
 
 npm start
 Then open in http://localhost:8000/
@@ -98,7 +98,7 @@ Then open in http://localhost:8000/
 5. History records served and left queues. Leaving prompts for confirmation.
 6. The bell opens in-app notifications; **Mark all read** updates the unread count.
 
-Email format, required fields, maximum lengths, password length, and confirmation are validated in the browser and again on the server. Restarting `npm start` clears all backend records (the seeded admin is recreated).
+Email format, required fields, maximum lengths, password length, and confirmation are validated in the browser and again on the server. Restarting `npm start` preserves accounts and queues. The demo admin and default services are seeded only when missing; edits and queue open/closed status are preserved.
 
 ## Tests
 
@@ -109,5 +109,42 @@ npm run test:coverage
 
 Tests cover business rules, validation, priority/FIFO ordering, wait estimates,
 notification thresholds and deduplication, history snapshots, account isolation,
-logout/reset behavior, and frontend API flows. `npm run test:coverage` prints
+logout/reset behavior, SQLite transactions, restart persistence, and frontend API flows. `npm run test:coverage` prints
 a coverage report; the standalone HTTP listener (`server.js`) is not included.
+
+## SQLite queue integration (A4 tables 4 and 5)
+
+The existing join, leave, current-queue, admin-view, serve-next, and service
+open/close APIs now read and write SQLite. Queue changes run in transactions,
+with priority/FIFO positions recalculated atomically. Served and canceled visits
+are retained. Foreign keys and unique indexes prevent orphan entries, duplicate
+waiting users, and duplicate waiting positions.
+
+`database/003_queue_dependencies.sql` supplies the supporting user/profile and
+service storage needed for queue entries to remain usable after restart. Coordinate
+these columns with the teammates owning tables 2 and 3. Notifications/history
+persistence remains separate work. See [database setup](database/README.md).
+
+To use a separate database for a demo:
+
+```sh
+QUEUESMART_DB_PATH=/tmp/queuesmart-demo.db npm start
+```
+
+To check persistence manually, register a user and join a queue, stop the server,
+restart with the same database path, then sign in with the same email/password.
+Your queue entry and position should still appear. Use a separate browser profile
+for the demo administrator to serve the user; restarting again should not restore
+the completed visit as an active entry.
+
+Run the database and backend tests:
+
+```sh
+python3 -B -m unittest discover -s database -p 'test_*.py' -v
+npm run test:coverage
+```
+
+Node tests use isolated in-memory databases, and restart tests use temporary files;
+they do not change the application database. Never set `QUEUESMART_DB_PATH` to
+an application database when running tests. The test-only `resetMemory` helper
+clears test records and refuses to run against file-backed databases.

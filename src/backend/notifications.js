@@ -1,3 +1,4 @@
+import {markApproachingNotified} from './queue-repository.js';
 import {requireAuth} from './auth.js';
 import {json} from './errors.js';
 import {addNotification, notificationsForUser, markNotificationsRead} from './memory.js';
@@ -13,7 +14,7 @@ export function notifyApproaching(queue, service) {
     if (entry.approachingNotified) return;
     notifyQueueEvent(entry, 'approaching',
       `Almost ready! You’re now #${index + 1} in the ${service.name} queue.`);
-    entry.approachingNotified = true;
+    markApproachingNotified(entry.id);
   });
 }
 

@@ -4,6 +4,7 @@ import {randomBytes} from 'node:crypto';
 import {requireAdmin, requireAuth} from './auth.js';
 import {HttpError, json} from './errors.js';
 import {estimateWaitMinutes} from './wait-time.js';
+import {serveNextEntry} from './queue-repository.js';
 import {
   addQueueEntry,
   allQueueEntries,
@@ -74,7 +75,7 @@ export function joinQueue(token, serviceId, body) {
     joinedAt: new Date().toISOString()
   });
   const queue = orderedQueue(serviceId);
-  const result = publicEntry(entry, queue.indexOf(entry) + 1);
+  const result = publicEntry(entry, entry.position);
   notifyQueueEvent(entry, 'joined',
     `You joined the ${service.name} queue. Your starting position is #${result.position}.`);
   notifyApproaching(queue, service);
@@ -84,10 +85,9 @@ export function joinQueue(token, serviceId, body) {
 export function leaveQueue(token, serviceId) {
   const session = requireAuth(token);
   const service = serviceOrThrow(serviceId);
-  const queue = orderedQueue(serviceId);
   const entry = removeQueueEntry(serviceId, session.userId);
   if (!entry) throw new HttpError(404, 'You are not waiting in this queue.');
-  recordVisit(publicEntry(entry, queue.indexOf(entry) + 1), service, 'Left queue');
+  recordVisit(publicEntry(entry, entry.position), service, 'Left queue');
   notifyQueueEvent(entry, 'left', `You left the ${service.name} queue.`);
   notifyApproaching(orderedQueue(serviceId), service);
   return {status: 204, body: null};
@@ -97,8 +97,7 @@ export function getMyQueue(token) {
   const session = requireAuth(token);
   const entry = allQueueEntries().find(item => item.userId === session.userId);
   if (!entry) return json(200, {entry: null});
-  const queue = orderedQueue(entry.serviceId);
-  return json(200, {entry: publicEntry(entry, queue.indexOf(entry) + 1)});
+  return json(200, {entry: publicEntry(entry, entry.position)});
 }
 
 export function viewQueue(token, serviceId) {
@@ -112,9 +111,8 @@ export function viewQueue(token, serviceId) {
 export function serveNext(token, serviceId) {
   requireAdmin(token);
   const service = serviceOrThrow(serviceId);
-  const next = orderedQueue(serviceId)[0];
+  const next = serveNextEntry(serviceId);
   if (!next) throw new HttpError(409, 'There is no one waiting in this queue.');
-  removeQueueEntry(serviceId, next.userId);
   const served = publicEntry(next, 1);
   recordVisit(served, service, 'Served');
   notifyQueueEvent(next, 'served', `You’ve been served by ${service.name}. Thanks for visiting!`);
